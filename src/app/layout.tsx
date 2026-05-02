@@ -2,11 +2,25 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { fontVariables } from "@/lib/fonts";
 
 export const metadata: Metadata = {
-  title: "Gruntdom — zobacz, co naprawdę możesz wybudować na działce",
+  title: {
+    default: "Gruntdom — zobacz, co naprawdę możesz wybudować na działce",
+    template: "%s · Gruntdom",
+  },
   description:
-    "Przeglądaj działki wraz z analizą potencjału zabudowy, warunkami planistycznymi i przykładowymi koncepcjami domów dopasowanymi do parametrów terenu.",
+    "Działki z pełną analizą potencjału zabudowy: warunki planistyczne, koncepcje domów dopasowane do parametrów działki i wizualizacje AI wkomponowane w realne zdjęcie terenu.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ),
+  openGraph: {
+    title: "Gruntdom",
+    description:
+      "Zobacz, co naprawdę możesz wybudować na konkretnej działce. Parametry, ograniczenia, warianty zabudowy i wizualizacje AI.",
+    type: "website",
+    locale: "pl_PL",
+  },
 };
 
 export default function RootLayout({
@@ -15,23 +29,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pl">
-      <head>
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="flex min-h-screen flex-col bg-white font-sans text-graphite-900">
+    <html lang="pl" className={fontVariables}>
+      <body className="flex min-h-screen flex-col bg-paper font-sans text-ink">
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
