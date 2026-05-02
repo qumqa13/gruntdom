@@ -13,47 +13,48 @@ const plotTypeLabel: Record<string, string> = {
 };
 
 export function PlotParameters({ plot }: PlotParametersProps) {
-  const rows: { label: string; value: string }[] = [
-    { label: "Powierzchnia", value: `${plot.area} m²` },
+  const utilities = [
+    plot.utilities.electricity.available ? "prąd" : null,
+    plot.utilities.water.available ? "woda" : null,
+    plot.utilities.gas.available ? "gaz" : null,
+    plot.utilities.sewage.available ? "kanalizacja" : null,
+  ].filter(Boolean);
+
+  const rows: { label: string; value: string; mono?: boolean }[] = [
+    { label: "Powierzchnia", value: `${plot.area} m²`, mono: true },
     {
       label: "Wymiary",
       value: `${plot.dimensions.width} × ${plot.dimensions.depth} m`,
+      mono: true,
     },
     { label: "Kształt", value: plot.shape },
-    {
-      label: "Dostęp do drogi",
-      value: plot.utilities.road.note,
-    },
+    { label: "Typ działki", value: plotTypeLabel[plot.plotType] ?? plot.plotType },
+    { label: "Dostęp do drogi", value: plot.utilities.road.note },
     {
       label: "Media",
-      value: [
-        plot.utilities.electricity.available ? "prąd" : null,
-        plot.utilities.water.available ? "woda" : null,
-        plot.utilities.gas.available ? "gaz" : null,
-        plot.utilities.sewage.available ? "kanalizacja" : null,
-      ]
-        .filter(Boolean)
-        .join(", ") || "ograniczony dostęp",
+      value: utilities.length > 0 ? utilities.join(", ") : "ograniczony dostęp",
     },
     { label: "Ukształtowanie", value: plot.terrain },
     { label: "Otoczenie", value: plot.surroundings },
-    {
-      label: "Typ działki",
-      value: plotTypeLabel[plot.plotType] ?? plot.plotType,
-    },
   ];
 
   return (
-    <dl className="divide-y divide-graphite-100 overflow-hidden rounded-2xl border border-graphite-100 bg-white">
-      {rows.map((row) => (
+    <dl className="overflow-hidden rounded-lg border border-line bg-surface">
+      {rows.map((row, idx) => (
         <div
           key={row.label}
-          className="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4"
+          className={`grid gap-1 px-6 py-5 sm:grid-cols-[200px_1fr] sm:gap-8 ${
+            idx > 0 ? "border-t border-line" : ""
+          }`}
         >
-          <dt className="text-sm font-medium text-graphite-500">
+          <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted">
             {row.label}
           </dt>
-          <dd className="text-sm text-graphite-900 sm:col-span-2">
+          <dd
+            className={`text-sm leading-relaxed text-ink ${
+              row.mono ? "num font-mono font-medium" : ""
+            }`}
+          >
             {row.value}
           </dd>
         </div>

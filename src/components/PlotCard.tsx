@@ -12,12 +12,10 @@ const analysisLabel: Record<AnalysisStatus, string> = {
   available: "Dane dostępne",
 };
 
-const analysisStyle: Record<AnalysisStatus, string> = {
-  ready: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-  in_progress:
-    "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-  available:
-    "bg-graphite-100 text-graphite-700 ring-1 ring-inset ring-graphite-200",
+const analysisDot: Record<AnalysisStatus, string> = {
+  ready: "bg-moss",
+  in_progress: "bg-amber",
+  available: "bg-ink-faint",
 };
 
 const plotTypeLabel: Record<string, string> = {
@@ -36,77 +34,109 @@ function formatPrice(value: number): string {
   }).format(value);
 }
 
+function formatArea(m2: number): string {
+  return new Intl.NumberFormat("pl-PL", {
+    maximumFractionDigits: 0,
+  }).format(m2);
+}
+
 export function PlotCard({ plot }: PlotCardProps) {
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-graphite-100 bg-white shadow-card transition hover:shadow-cardHover">
-      <div className="relative aspect-[16/10] w-full bg-graphite-100">
+    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-350 ease-atelier hover:-translate-y-1 hover:border-line-strong hover:shadow-cardHover">
+      {/* IMAGE */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-paper-deep">
         <PlotImagePlaceholder
           src={plot.mainImage}
           alt={plot.title}
           variant="plot"
           label={plot.title}
           className="h-full"
+          hoverZoom
         />
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${analysisStyle[plot.analysisStatus]}`}
-          >
+
+        {/* Top overlay row */}
+        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-paper/90 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink backdrop-blur">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${analysisDot[plot.analysisStatus]}`}
+              aria-hidden
+            />
             {analysisLabel[plot.analysisStatus]}
           </span>
-          <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-graphite-700 ring-1 ring-inset ring-graphite-200 backdrop-blur">
+          <span className="inline-flex items-center rounded-md border border-paper/40 bg-ink/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-paper backdrop-blur">
             {plotTypeLabel[plot.plotType] ?? plot.plotType}
           </span>
         </div>
-        <div className="absolute bottom-3 right-3 inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-graphite-700 ring-1 ring-inset ring-graphite-200 backdrop-blur">
-          {plot.concepts.length} koncepcje
+
+        {/* Bottom-right pill */}
+        <div className="absolute bottom-3 right-3">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/80 px-2.5 py-1 text-[11px] font-medium text-paper backdrop-blur">
+            <span className="num font-mono">{plot.concepts.length}</span>
+            <span className="text-paper/70">koncepcje</span>
+          </span>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <h3 className="text-lg font-semibold text-graphite-900">
+      {/* CONTENT */}
+      <div className="flex flex-1 flex-col p-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="num font-mono text-[11px] uppercase tracking-[0.16em] text-ink-muted">
+            {plot.region}
+          </span>
+        </div>
+
+        <h3 className="mt-2 font-display text-xl leading-tight tracking-tight text-ink">
           {plot.title}
         </h3>
-        <p className="mt-1 text-sm text-graphite-600">{plot.location}</p>
+        <p className="mt-1 text-sm text-ink-body">{plot.location}</p>
 
-        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-graphite-600">
+        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-ink-body">
           {plot.description}
         </p>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        {/* Spec strip */}
+        <dl className="mt-6 grid grid-cols-3 gap-4 border-t border-line pt-5">
           <div>
-            <dt className="text-xs uppercase tracking-wider text-graphite-500">
+            <dt className="text-[10px] uppercase tracking-[0.16em] text-ink-muted">
               Cena
             </dt>
-            <dd className="font-semibold text-graphite-900">
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
               {formatPrice(plot.price)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wider text-graphite-500">
+            <dt className="text-[10px] uppercase tracking-[0.16em] text-ink-muted">
               Powierzchnia
             </dt>
-            <dd className="font-semibold text-graphite-900">
-              {plot.area} m²
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
+              {formatArea(plot.area)} m²
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.16em] text-ink-muted">
+              Cena / m²
+            </dt>
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
+              {formatArea(plot.pricePerM2)} zł
             </dd>
           </div>
         </dl>
 
+        {/* CTA */}
         <Link
           href={`/plots/${plot.slug}`}
-          className="mt-5 inline-flex items-center justify-center rounded-md bg-graphite-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-graphite-800"
+          className="group/link mt-6 inline-flex items-center justify-between gap-2 rounded-md border border-line-strong bg-paper px-4 py-3 text-sm font-medium text-ink transition-all duration-250 ease-atelier hover:border-ink hover:bg-ink hover:text-paper"
         >
-          Zobacz potencjał działki
+          <span>Zobacz potencjał działki</span>
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="ml-1.5 h-4 w-4"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="h-4 w-4 transition-transform duration-250 group-hover/link:translate-x-1"
           >
-            <path
-              fillRule="evenodd"
-              d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-              clipRule="evenodd"
-            />
+            <path d="M3.5 8h9M9 4.5l3.5 3.5L9 11.5" />
           </svg>
         </Link>
       </div>

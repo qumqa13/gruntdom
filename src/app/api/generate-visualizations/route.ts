@@ -1,85 +1,59 @@
 import { NextResponse } from "next/server";
 import { generateVisualization } from "@/lib/generateVisualization";
+import {
+  GenerateVisualizationsRequestSchema,
+  formatZodError,
+} from "@/lib/schemas";
+import { checkRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
+import { RATE_LIMIT } from "@/lib/config";
 import type {
-  GenerateVisualizationsRequest,
   GenerateVisualizationsResponse,
   VisualizationGenerationResult,
-  VisualizationVariantRequest,
 } from "@/types/visualization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function isValidVariant(v: unknown): v is VisualizationVariantRequest {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    (o.label === "S" || o.label === "M" || o.label === "L") &&
-    typeof o.name === "string" &&
-    typeof o.usableArea === "number" &&
-    typeof o.buildingArea === "number" &&
-    typeof o.height === "number" &&
-    typeof o.floors === "number" &&
-    typeof o.roofType === "string" &&
-    typeof o.architectStudio === "string" &&
-    typeof o.styleDescription === "string"
-  );
-}
-
 export async function POST(request: Request) {
-  let body: GenerateVisualizationsRequest;
+  // Rate limit BEFORE we even parse the body — cheap to reject.
+  const ip = clientIpFromRequest(request);
+  const limit = checkRateLimit(ip);
+  if (!limit.allowed) {
+    const retryAfterSec = Math.ceil(limit.resetMs / 1000);
+    return NextResponse.json(
+      {
+        error: `Limit ${RATE_LIMIT.generationsPerHour} generowań na godzinę został wyczerpany. Spróbuj ponownie za ~${retryAfterSec}s.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
+  let rawBody: unknown;
   try {
-    body = (await request.json()) as GenerateVisualizationsRequest;
+    rawBody = await request.json();
   } catch {
     return NextResponse.json(
       { error: "Nieprawidłowy JSON w body." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  if (!body || typeof body !== "object") {
+  const parsed = GenerateVisualizationsRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Brak body requestu." },
-      { status: 400 }
+      { error: `Błąd walidacji: ${formatZodError(parsed.error)}` },
+      { status: 400 },
     );
   }
 
-  const {
-    plotSlug,
-    plotTitle,
-    baseImageUrl,
-    surroundings,
-    terrain,
-    variants,
-  } = body;
-
-  if (
-    typeof plotSlug !== "string" ||
-    typeof plotTitle !== "string" ||
-    typeof baseImageUrl !== "string" ||
-    typeof surroundings !== "string" ||
-    typeof terrain !== "string"
-  ) {
-    return NextResponse.json(
-      { error: "Niekompletne dane działki w requeście." },
-      { status: 400 }
-    );
-  }
-
-  if (!Array.isArray(variants) || variants.length === 0) {
-    return NextResponse.json(
-      { error: "Brak wariantów do wygenerowania." },
-      { status: 400 }
-    );
-  }
-
-  if (!variants.every(isValidVariant)) {
-    return NextResponse.json(
-      { error: "Nieprawidłowa struktura wariantu." },
-      { status: 400 }
-    );
-  }
+  const { plotSlug, plotTitle, baseImageUrl, surroundings, terrain, variants } =
+    parsed.data;
 
   const plotContext = {
     plotSlug,
@@ -104,5 +78,9 @@ export async function POST(request: Request) {
     : "mock";
 
   const payload: GenerateVisualizationsResponse = { results, mode };
-  return NextResponse.json(payload);
+  return NextResponse.json(payload, {
+    headers: {
+      "X-RateLimit-Remaining": String(limit.remaining),
+    },
+  });
 }

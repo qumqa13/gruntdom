@@ -12,54 +12,51 @@ export function ComplianceSummary({
 }: ComplianceSummaryProps) {
   return (
     <div
-      className={`rounded-xl border border-graphite-100 bg-white ${
+      className={`rounded-lg border border-line bg-paper-soft ${
         compact ? "p-4" : "p-5"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-graphite-900">
-          Wstępna analiza zgodności
+        <div>
+          <div className="eyebrow">Wstępna zgodność z planem</div>
+          <div className="mt-1 text-sm font-medium text-ink">
+            Analiza koncepcji vs warunki działki
+          </div>
         </div>
         <ComplianceBadge status={result.overall} size="sm" />
       </div>
 
-      <p className="mt-2 text-sm leading-relaxed text-graphite-600">
+      <p className="mt-3 text-sm leading-relaxed text-ink-body">
         {result.summary}
       </p>
 
-      <ul className="mt-4 space-y-2">
+      <ul className="mt-4 space-y-2.5">
         {result.checks.map((check) => (
           <li
             key={check.label}
-            className="flex flex-col gap-1 rounded-lg border border-graphite-100 bg-graphite-50/50 p-3 sm:flex-row sm:items-start sm:justify-between"
+            className="flex flex-col gap-2 rounded-md border border-line bg-surface p-3 sm:flex-row sm:items-start sm:justify-between"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-medium text-graphite-900">
+                <div className="text-sm font-medium text-ink">
                   {check.label}
                 </div>
                 <ComplianceBadge status={check.status} size="sm" />
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-graphite-600">
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-body">
                 {check.message}
               </p>
             </div>
             {(check.value || check.limit) && (
-              <div className="flex flex-col text-right text-xs text-graphite-600 sm:flex-none">
+              <div className="flex flex-col text-right text-xs sm:flex-none sm:gap-0.5">
                 {check.value && (
-                  <span>
-                    Wartość:{" "}
-                    <span className="font-semibold text-graphite-900">
-                      {check.value}
-                    </span>
+                  <span className="num font-mono text-sm font-medium text-ink">
+                    {check.value}
                   </span>
                 )}
                 {check.limit && (
-                  <span>
-                    Limit:{" "}
-                    <span className="font-medium text-graphite-700">
-                      {check.limit}
-                    </span>
+                  <span className="num font-mono text-[11px] text-ink-muted">
+                    limit {check.limit}
                   </span>
                 )}
               </div>

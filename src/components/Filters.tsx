@@ -61,7 +61,10 @@ const statusOptions: {
 ];
 
 const selectCls =
-  "mt-1 w-full rounded-md border border-graphite-200 bg-white px-3 py-2 text-sm text-graphite-900 shadow-sm transition focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "mt-2 w-full appearance-none rounded-md border border-line-strong bg-surface px-3 py-2.5 pr-9 text-sm text-ink transition-all duration-200 hover:border-ink-muted focus:border-clay focus:outline-none focus:ring-2 focus:ring-clay-soft";
+
+const chevron =
+  "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted";
 
 export function Filters({
   filters,
@@ -75,121 +78,183 @@ export function Filters({
     onChange({ ...filters, [key]: value });
   }
 
+  const hasActiveFilters =
+    filters.location !== "all" ||
+    filters.area !== "all" ||
+    filters.price !== "all" ||
+    filters.plotType !== "all" ||
+    filters.analysisStatus !== "all";
+
   return (
-    <div className="rounded-2xl border border-graphite-100 bg-white p-5 shadow-card sm:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div className="rounded-lg border border-line bg-surface p-6 shadow-card sm:p-7">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-base font-semibold text-graphite-900">
-            Filtry działek
+          <div className="eyebrow">Filtry</div>
+          <h3 className="mt-2 font-display text-xl text-ink">
+            Zawęź listę działek
           </h3>
-          <p className="text-sm text-graphite-600">
-            Zawęź listę do parametrów, które Cię interesują.
-          </p>
         </div>
-        <div className="text-sm text-graphite-600">
-          Wyświetlanych: <span className="font-semibold text-graphite-900">{visible}</span>{" "}
-          z {total}
+        <div className="flex items-baseline gap-2 text-sm text-ink-body">
+          <span className="num font-mono text-lg text-ink">{visible}</span>
+          <span className="text-ink-muted">z</span>
+          <span className="num font-mono text-ink-body">{total}</span>
+          <span className="text-ink-muted">działek</span>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <label className="text-sm">
-          <span className="font-medium text-graphite-800">Lokalizacja</span>
-          <select
-            value={filters.location}
-            onChange={(e) => update("location", e.target.value)}
-            className={selectCls}
-          >
-            <option value="all">Wszystkie lokalizacje</option>
-            {locations.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-5">
+        <FilterField label="Lokalizacja">
+          <div className="relative">
+            <select
+              value={filters.location}
+              onChange={(e) => update("location", e.target.value)}
+              className={selectCls}
+            >
+              <option value="all">Wszystkie lokalizacje</option>
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+        </FilterField>
 
-        <label className="text-sm">
-          <span className="font-medium text-graphite-800">Powierzchnia</span>
-          <select
-            value={filters.area}
-            onChange={(e) =>
-              update("area", e.target.value as FilterState["area"])
-            }
-            className={selectCls}
-          >
-            {areaOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterField label="Powierzchnia">
+          <div className="relative">
+            <select
+              value={filters.area}
+              onChange={(e) =>
+                update("area", e.target.value as FilterState["area"])
+              }
+              className={selectCls}
+            >
+              {areaOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+        </FilterField>
 
-        <label className="text-sm">
-          <span className="font-medium text-graphite-800">Cena</span>
-          <select
-            value={filters.price}
-            onChange={(e) =>
-              update("price", e.target.value as FilterState["price"])
-            }
-            className={selectCls}
-          >
-            {priceOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterField label="Cena">
+          <div className="relative">
+            <select
+              value={filters.price}
+              onChange={(e) =>
+                update("price", e.target.value as FilterState["price"])
+              }
+              className={selectCls}
+            >
+              {priceOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+        </FilterField>
 
-        <label className="text-sm">
-          <span className="font-medium text-graphite-800">Typ działki</span>
-          <select
-            value={filters.plotType}
-            onChange={(e) =>
-              update("plotType", e.target.value as FilterState["plotType"])
-            }
-            className={selectCls}
-          >
-            {plotTypeOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterField label="Typ działki">
+          <div className="relative">
+            <select
+              value={filters.plotType}
+              onChange={(e) =>
+                update("plotType", e.target.value as FilterState["plotType"])
+              }
+              className={selectCls}
+            >
+              {plotTypeOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+        </FilterField>
 
-        <label className="text-sm">
-          <span className="font-medium text-graphite-800">Status analizy</span>
-          <select
-            value={filters.analysisStatus}
-            onChange={(e) =>
-              update(
-                "analysisStatus",
-                e.target.value as FilterState["analysisStatus"]
-              )
-            }
-            className={selectCls}
-          >
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterField label="Status analizy">
+          <div className="relative">
+            <select
+              value={filters.analysisStatus}
+              onChange={(e) =>
+                update(
+                  "analysisStatus",
+                  e.target.value as FilterState["analysisStatus"],
+                )
+              }
+              className={selectCls}
+            >
+              {statusOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+        </FilterField>
       </div>
 
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-sm font-medium text-brand-700 transition hover:text-brand-800"
-        >
-          Wyczyść filtry
-        </button>
-      </div>
+      {hasActiveFilters && (
+        <div className="mt-6 flex justify-end border-t border-line pt-5">
+          <button
+            type="button"
+            onClick={onReset}
+            className="group inline-flex items-center gap-2 text-sm font-medium text-ink-body transition-colors hover:text-clay"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              className="h-3.5 w-3.5 transition-transform duration-250 group-hover:rotate-90"
+            >
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
+            Wyczyść filtry
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function Chevron() {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={chevron + " h-3 w-3"}
+    >
+      <path d="M3 5l3 3 3-3" />
+    </svg>
   );
 }

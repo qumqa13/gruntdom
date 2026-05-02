@@ -13,6 +13,8 @@ import { MapPlaceholder } from "@/components/MapPlaceholder";
 import { Disclaimer } from "@/components/Disclaimer";
 import { GenerateVisualizationsPanel } from "@/components/visualizations/GenerateVisualizationsPanel";
 import { conceptsToVisualizationVariants } from "@/lib/visualizationVariants";
+import { mailtoLink } from "@/lib/config";
+import { Reveal, RevealStagger, RevealStaggerItem } from "@/lib/motion";
 import type { AnalysisStatus } from "@/types/plot";
 
 type PlotPageParams = Promise<{ slug: string }>;
@@ -31,12 +33,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const plot = getPlotBySlug(slug);
   if (!plot) {
-    return {
-      title: "Nie znaleziono działki — Gruntdom",
-    };
+    return { title: "Nie znaleziono działki" };
   }
   return {
-    title: `${plot.title} — Gruntdom`,
+    title: plot.title,
     description: plot.description,
   };
 }
@@ -47,12 +47,10 @@ const analysisLabel: Record<AnalysisStatus, string> = {
   available: "Dane dostępne",
 };
 
-const analysisStyle: Record<AnalysisStatus, string> = {
-  ready: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-  in_progress:
-    "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-  available:
-    "bg-graphite-100 text-graphite-700 ring-1 ring-inset ring-graphite-200",
+const analysisDot: Record<AnalysisStatus, string> = {
+  ready: "bg-moss",
+  in_progress: "bg-amber",
+  available: "bg-ink-faint",
 };
 
 function formatPrice(value: number): string {
@@ -73,21 +71,26 @@ function SectionHeading({
   eyebrow,
   title,
   description,
+  number,
 }: {
   eyebrow: string;
   title: string;
   description?: string;
+  number?: string;
 }) {
   return (
     <div className="max-w-3xl">
-      <div className="text-xs font-semibold uppercase tracking-wider text-brand-700">
-        {eyebrow}
+      <div className="flex items-center gap-3">
+        {number && (
+          <span className="num font-mono text-[11px] text-clay">{number}</span>
+        )}
+        <div className="eyebrow">{eyebrow}</div>
       </div>
-      <h2 className="mt-1 text-2xl font-semibold tracking-tight text-graphite-900 sm:text-3xl">
+      <h2 className="mt-3 font-display text-2xl leading-tight tracking-tight text-ink sm:text-3xl">
         {title}
       </h2>
       {description && (
-        <p className="mt-2 text-sm leading-relaxed text-graphite-600">
+        <p className="mt-3 text-sm leading-relaxed text-ink-body">
           {description}
         </p>
       )}
@@ -103,288 +106,262 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
   }
 
   const visualizationVariants = conceptsToVisualizationVariants(plot.concepts);
+  const maxBuildingArea = Math.round(
+    (plot.area * plot.planning.maxBuildingCoveragePct) / 100,
+  );
+  const minBioArea = Math.round(
+    (plot.area * plot.planning.minBiologicallyActiveAreaPct) / 100,
+  );
 
   return (
-    <div className="bg-graphite-50/50">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <nav className="mb-6 text-sm">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-graphite-600 transition hover:text-graphite-900"
+    <div className="bg-paper">
+      {/* === BREADCRUMB === */}
+      <div className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 lg:px-12">
+        <Link
+          href="/"
+          className="group inline-flex items-center gap-2 text-sm text-ink-body transition-colors hover:text-ink"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="h-3.5 w-3.5 transition-transform duration-250 group-hover:-translate-x-1"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="h-4 w-4"
-            >
-              <path
-                fillRule="evenodd"
-                d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <path d="M12.5 8h-9M7 4.5L3.5 8 7 11.5" />
+          </svg>
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em]">
             Wszystkie działki
-          </Link>
-        </nav>
+          </span>
+        </Link>
+      </div>
 
-        <header className="rounded-2xl border border-graphite-100 bg-white p-6 shadow-card sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${analysisStyle[plot.analysisStatus]}`}
-                >
-                  {analysisLabel[plot.analysisStatus]}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-graphite-100 px-2.5 py-1 text-xs font-medium text-graphite-700">
-                  {plot.region}
-                </span>
-              </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-graphite-900 sm:text-4xl">
-                {plot.title}
-              </h1>
-              <p className="mt-2 text-base text-graphite-600">
-                {plot.location}
-              </p>
-
-              <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-graphite-500">
-                    Cena
-                  </dt>
-                  <dd className="mt-0.5 text-lg font-semibold text-graphite-900">
-                    {formatPrice(plot.price)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-graphite-500">
-                    Cena / m²
-                  </dt>
-                  <dd className="mt-0.5 text-lg font-semibold text-graphite-900">
-                    {formatPricePerM2(plot.pricePerM2)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-graphite-500">
-                    Powierzchnia
-                  </dt>
-                  <dd className="mt-0.5 text-lg font-semibold text-graphite-900">
-                    {plot.area} m²
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-graphite-500">
-                    Wymiary
-                  </dt>
-                  <dd className="mt-0.5 text-lg font-semibold text-graphite-900">
-                    {plot.dimensions.width} × {plot.dimensions.depth} m
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
-              <a
-                href="mailto:kontakt@gruntdom.example?subject=Pełna analiza działki"
-                className="inline-flex items-center justify-center rounded-md bg-brand-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700"
-              >
-                Umów pełną analizę
-              </a>
-              <a
-                href="mailto:kontakt@gruntdom.example?subject=Poproszę o raport PDF"
-                className="inline-flex items-center justify-center rounded-md border border-graphite-200 bg-white px-5 py-3 text-sm font-medium text-graphite-800 transition hover:border-graphite-300 hover:bg-graphite-50"
-              >
-                Poproś o raport
-              </a>
-            </div>
+      {/* === HERO === */}
+      <header className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 lg:px-12 lg:pb-22">
+        <Reveal>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-md border border-line-strong bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-body">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${analysisDot[plot.analysisStatus]}`}
+                aria-hidden
+              />
+              {analysisLabel[plot.analysisStatus]}
+            </span>
+            <span className="inline-flex items-center rounded-md border border-line bg-paper-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-body">
+              {plot.region}
+            </span>
           </div>
-        </header>
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-3">
-          {/* LEWA KOLUMNA */}
-          <div className="space-y-10 lg:col-span-2">
-            <section>
-              <SectionHeading eyebrow="Galeria" title="Zdjęcia i ujęcia" />
-              <div className="mt-5">
+          <h1 className="mt-6 max-w-4xl font-display text-4xl leading-[1.05] tracking-tight text-ink sm:text-5xl lg:text-6xl">
+            {plot.title}
+          </h1>
+          <p className="mt-4 text-md text-ink-body">{plot.location}</p>
+        </Reveal>
+
+        <Reveal
+          delay={0.1}
+          className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12"
+        >
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-8 lg:col-span-8 lg:grid-cols-4">
+            <Stat label="Cena" value={formatPrice(plot.price)} />
+            <Stat label="Cena / m²" value={formatPricePerM2(plot.pricePerM2)} />
+            <Stat
+              label="Powierzchnia"
+              value={`${plot.area.toLocaleString("pl-PL")} m²`}
+            />
+            <Stat
+              label="Wymiary"
+              value={`${plot.dimensions.width} × ${plot.dimensions.depth} m`}
+            />
+          </dl>
+
+          <div className="flex flex-col gap-3 self-end lg:col-span-4 lg:items-end">
+            <a
+              href={mailtoLink(`Pełna analiza działki: ${plot.title}`)}
+              className="group btn-accent w-full justify-center sm:w-auto"
+            >
+              Umów pełną analizę
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                className="h-3.5 w-3.5 transition-transform duration-250 group-hover:translate-x-1"
+              >
+                <path d="M3.5 8h9M9 4.5l3.5 3.5L9 11.5" />
+              </svg>
+            </a>
+            <a
+              href={mailtoLink(`Raport PDF dla działki: ${plot.title}`)}
+              className="btn-ghost w-full justify-center sm:w-auto"
+            >
+              Poproś o raport
+            </a>
+          </div>
+        </Reveal>
+      </header>
+
+      <div className="hairline mx-auto max-w-7xl px-5 sm:px-8 lg:px-12" />
+
+      {/* === MAIN GRID === */}
+      <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12 lg:py-22">
+        <div className="grid gap-12 lg:grid-cols-3 lg:gap-12">
+          {/* LEFT COLUMN */}
+          <div className="space-y-22 lg:col-span-2">
+            <Reveal as="section">
+              <SectionHeading
+                number="01"
+                eyebrow="Galeria"
+                title="Zdjęcia i ujęcia"
+              />
+              <div className="mt-8">
                 <PlotGallery
                   mainImage={plot.mainImage}
                   gallery={plot.gallery}
                   title={plot.title}
                 />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
-                eyebrow="Potencjał działki"
+                number="02"
+                eyebrow="Potencjał"
                 title="Dlaczego ta działka może mieć sens"
                 description={plot.description}
               />
-              <ul className="mt-5 space-y-2">
-                {plot.whyItMakesSense.map((reason) => (
-                  <li
+              <RevealStagger
+                className="mt-8 overflow-hidden rounded-lg border border-line bg-surface"
+                staggerSeconds={0.05}
+              >
+                {plot.whyItMakesSense.map((reason, idx) => (
+                  <RevealStaggerItem
                     key={reason}
-                    className="flex items-start gap-3 rounded-xl border border-graphite-100 bg-white px-4 py-3 text-sm text-graphite-800"
+                    className={`flex items-start gap-5 px-6 py-5 ${
+                      idx > 0 ? "border-t border-line" : ""
+                    }`}
                   >
-                    <span
-                      aria-hidden
-                      className="mt-1 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-brand-100 text-brand-700"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className="h-3.5 w-3.5"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
+                    <span className="num font-mono text-xs text-clay">
+                      {String(idx + 1).padStart(2, "0")}
                     </span>
-                    <span>{reason}</span>
-                  </li>
+                    <span className="flex-1 text-sm leading-relaxed text-ink">
+                      {reason}
+                    </span>
+                  </RevealStaggerItem>
                 ))}
-              </ul>
-            </section>
+              </RevealStagger>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
+                number="03"
                 eyebrow="Parametry"
                 title="Kluczowe parametry działki"
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <PlotParameters plot={plot} />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
-                eyebrow="Mapa poglądowa"
-                title="Lokalizacja i kontekst"
+                number="04"
+                eyebrow="Lokalizacja"
+                title="Mapa i kontekst"
                 description="Mapa poglądowa — integracja z Google Maps / Mapbox planowana w kolejnym etapie."
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <MapPlaceholder location={plot.location} />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
-                eyebrow="Warunki planistyczne"
-                title="Limity zabudowy z planu lub WZ"
-                description="Parametry pochodzące z MPZP lub przyjęte na podstawie analizy urbanistycznej — przed projektem wymagają potwierdzenia w urzędzie."
+                number="05"
+                eyebrow="Plan"
+                title="Limity zabudowy z MPZP lub WZ"
+                description="Parametry pochodzące z planu miejscowego lub przyjęte na podstawie analizy urbanistycznej — przed projektem wymagają potwierdzenia w urzędzie."
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <PlanningConditions
                   planning={plot.planning}
                   plotArea={plot.area}
                 />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
-                eyebrow="Media i dostęp"
-                title="Media, sieci i dojazd"
+                number="06"
+                eyebrow="Media"
+                title="Sieci i dojazd"
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <UtilitiesSection utilities={plot.utilities} />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
+                number="07"
                 eyebrow="Due diligence"
                 title="Checklista przed zakupem"
-                description="Cztery obszary, które warto sprawdzić przed decyzją o zakupie. Status jest wstępny i bazuje na danych MVP."
+                description="Cztery obszary, które warto zweryfikować przed decyzją o zakupie. Status jest wstępny i bazuje na danych MVP."
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <DueDiligenceChecklist groups={plot.dueDiligence} />
               </div>
-            </section>
+            </Reveal>
 
-            <section>
+            <Reveal as="section">
               <SectionHeading
+                number="08"
                 eyebrow="Ryzyka"
                 title="Ryzyka do weryfikacji"
-                description="Lista zidentyfikowanych ryzyk wraz z poziomem. Każde z nich warto zweryfikować z prawnikiem lub specjalistą branżowym."
+                description="Każde ryzyko warto skonsultować z prawnikiem lub specjalistą branżowym."
               />
-              <div className="mt-5">
+              <div className="mt-8">
                 <RiskList risks={plot.risks} />
               </div>
-            </section>
+            </Reveal>
           </div>
 
-          {/* PRAWA KOLUMNA — sticky summary */}
+          {/* RIGHT COLUMN — sticky */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
-              <div className="rounded-2xl border border-graphite-100 bg-white p-5 shadow-card">
-                <h3 className="text-sm font-semibold text-graphite-900">
-                  Wstępna analiza zgodności działki
+            <div className="sticky top-22 space-y-5">
+              <div className="rounded-lg border border-line bg-surface p-6 shadow-card">
+                <div className="eyebrow">Wstępna analiza</div>
+                <h3 className="mt-2 font-display text-lg text-ink">
+                  Zgodność z warunkami planu
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-graphite-600">
-                  Maksymalna dopuszczalna powierzchnia zabudowy oraz minimalna
-                  wymagana powierzchnia biologicznie czynna wynikają z warunków
-                  planistycznych tej działki.
+                <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+                  Limity wynikają z warunków planistycznych tej działki.
                 </p>
 
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex items-start justify-between gap-3 rounded-lg bg-graphite-50 p-3">
-                    <dt className="text-graphite-600">Maks. pow. zabudowy</dt>
-                    <dd className="text-right">
-                      <div className="font-semibold text-graphite-900">
-                        ~
-                        {Math.round(
-                          (plot.area *
-                            plot.planning.maxBuildingCoveragePct) /
-                            100
-                        )}{" "}
-                        m²
-                      </div>
-                      <div className="text-xs text-graphite-500">
-                        {plot.planning.maxBuildingCoveragePct}% z{" "}
-                        {plot.area} m²
-                      </div>
-                    </dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-3 rounded-lg bg-graphite-50 p-3">
-                    <dt className="text-graphite-600">
-                      Min. pow. biologicznie czynna
-                    </dt>
-                    <dd className="text-right">
-                      <div className="font-semibold text-graphite-900">
-                        ~
-                        {Math.round(
-                          (plot.area *
-                            plot.planning.minBiologicallyActiveAreaPct) /
-                            100
-                        )}{" "}
-                        m²
-                      </div>
-                      <div className="text-xs text-graphite-500">
-                        {plot.planning.minBiologicallyActiveAreaPct}% z{" "}
-                        {plot.area} m²
-                      </div>
-                    </dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-3 rounded-lg bg-graphite-50 p-3">
-                    <dt className="text-graphite-600">Maks. wysokość</dt>
-                    <dd className="text-right font-semibold text-graphite-900">
-                      {plot.planning.maxHeight} m
-                    </dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-3 rounded-lg bg-graphite-50 p-3">
-                    <dt className="text-graphite-600">Maks. kondygnacje</dt>
-                    <dd className="text-right font-semibold text-graphite-900">
-                      {plot.planning.maxFloors}
-                    </dd>
-                  </div>
+                <dl className="mt-5 divide-y divide-line">
+                  <SidebarRow
+                    label="Maks. pow. zabudowy"
+                    value={`~${maxBuildingArea.toLocaleString("pl-PL")} m²`}
+                    hint={`${plot.planning.maxBuildingCoveragePct}% z ${plot.area.toLocaleString("pl-PL")} m²`}
+                  />
+                  <SidebarRow
+                    label="Min. pow. biologicznie czynna"
+                    value={`~${minBioArea.toLocaleString("pl-PL")} m²`}
+                    hint={`${plot.planning.minBiologicallyActiveAreaPct}% z ${plot.area.toLocaleString("pl-PL")} m²`}
+                  />
+                  <SidebarRow
+                    label="Maks. wysokość"
+                    value={`${plot.planning.maxHeight} m`}
+                  />
+                  <SidebarRow
+                    label="Maks. kondygnacje"
+                    value={String(plot.planning.maxFloors)}
+                  />
                 </dl>
 
-                <p className="mt-4 text-xs leading-relaxed text-graphite-500">
+                <p className="mt-5 border-t border-line pt-4 text-xs leading-relaxed text-ink-muted">
                   Uproszczona analiza MVP. Nie zastępuje pełnej oceny
                   architektonicznej ani prawnej.
                 </p>
@@ -394,38 +371,91 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
             </div>
           </aside>
         </div>
-
-        {/* KONCEPCJE */}
-        <section className="mt-16">
-          <SectionHeading
-            eyebrow="Możliwe warianty zabudowy"
-            title="Trzy koncepcje dopasowane do tej działki"
-            description="Każda koncepcja została porównana z limitami planu — poniżej zobaczysz, gdzie projekt mieści się bez problemu, a gdzie wymaga weryfikacji."
-          />
-
-          <div className="mt-8 grid gap-6 lg:grid-cols-3">
-            {plot.concepts.map((concept) => (
-              <ConceptCard key={concept.id} plot={plot} concept={concept} />
-            ))}
-          </div>
-        </section>
-
-        {/* Panel generowania wizualizacji AI na podstawie zdjęcia działki */}
-        <section className="mt-16">
-          <GenerateVisualizationsPanel
-            plotSlug={plot.slug}
-            plotTitle={plot.title}
-            baseImageUrl={plot.mainImage}
-            surroundings={plot.surroundings}
-            terrain={plot.terrain}
-            variants={visualizationVariants}
-          />
-        </section>
-
-        <div className="mt-16">
-          <Disclaimer />
-        </div>
       </div>
+
+      {/* === KONCEPCJE === */}
+      <section className="border-t border-line bg-paper-deep">
+        <div className="mx-auto max-w-7xl px-5 py-22 sm:px-8 lg:px-12 lg:py-30">
+          <Reveal>
+            <SectionHeading
+              number="09"
+              eyebrow="Warianty zabudowy"
+              title="Trzy koncepcje dopasowane do tej działki"
+              description="Każda koncepcja porównana z limitami planu — zobaczysz, gdzie projekt mieści się bez problemu, a gdzie wymaga weryfikacji."
+            />
+          </Reveal>
+
+          <RevealStagger
+            className="mt-12 grid gap-6 lg:grid-cols-3"
+            staggerSeconds={0.1}
+          >
+            {plot.concepts.map((concept) => (
+              <RevealStaggerItem key={concept.id}>
+                <ConceptCard plot={plot} concept={concept} />
+              </RevealStaggerItem>
+            ))}
+          </RevealStagger>
+        </div>
+      </section>
+
+      {/* === WIZUALIZACJE AI === */}
+      <section className="bg-paper">
+        <div className="mx-auto max-w-7xl px-5 py-22 sm:px-8 lg:px-12 lg:py-30">
+          <Reveal>
+            <GenerateVisualizationsPanel
+              plotSlug={plot.slug}
+              plotTitle={plot.title}
+              baseImageUrl={plot.mainImage}
+              surroundings={plot.surroundings}
+              terrain={plot.terrain}
+              variants={visualizationVariants}
+            />
+          </Reveal>
+
+          <div className="mt-12">
+            <Disclaimer />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted">
+        {label}
+      </dt>
+      <dd className="num mt-2 font-mono text-xl text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function SidebarRow({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+      <dt className="max-w-[140px] text-xs leading-tight text-ink-body">
+        {label}
+      </dt>
+      <dd className="text-right">
+        <div className="num font-mono text-sm font-medium text-ink">
+          {value}
+        </div>
+        {hint && (
+          <div className="num mt-0.5 font-mono text-[10px] text-ink-muted">
+            {hint}
+          </div>
+        )}
+      </dd>
     </div>
   );
 }

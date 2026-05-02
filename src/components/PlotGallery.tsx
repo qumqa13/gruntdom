@@ -9,38 +9,59 @@ interface PlotGalleryProps {
   title: string;
 }
 
+const SLOT_COUNT = 4;
+
 export function PlotGallery({ mainImage, gallery, title }: PlotGalleryProps) {
   const images = [mainImage, ...gallery].filter(Boolean) as string[];
-  const fallbackCount = Math.max(4 - images.length, 0);
-  const slots: (string | undefined)[] = [...images];
-  for (let i = 0; i < fallbackCount; i++) slots.push(undefined);
+  const slots: (string | undefined)[] = Array.from(
+    { length: SLOT_COUNT },
+    (_, i) => images[i],
+  );
 
   const [activeIdx, setActiveIdx] = useState(0);
-  const activeSrc = slots[activeIdx];
+  const safeIdx = Math.min(activeIdx, SLOT_COUNT - 1);
+  const activeSrc = slots[safeIdx];
 
   return (
     <div>
-      <div className="aspect-[16/9] w-full overflow-hidden rounded-2xl border border-graphite-100 bg-graphite-100">
-        <PlotImagePlaceholder
-          src={activeSrc}
-          alt={`${title} — zdjęcie ${activeIdx + 1}`}
-          variant="plot"
-          label={title}
-          className="h-full"
-        />
+      <div className="group relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-line bg-paper-deep">
+        <div
+          key={safeIdx}
+          className="absolute inset-0 animate-fade-in"
+        >
+          <PlotImagePlaceholder
+            src={activeSrc}
+            alt={`${title} — zdjęcie ${safeIdx + 1}`}
+            variant="plot"
+            label={title}
+            className="h-full"
+          />
+        </div>
+
+        {/* Index marker, top-right */}
+        <div className="pointer-events-none absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-md bg-ink/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-paper backdrop-blur">
+          <span className="num">
+            {String(safeIdx + 1).padStart(2, "0")}
+          </span>
+          <span className="text-paper/60">/</span>
+          <span className="num text-paper/60">
+            {String(SLOT_COUNT).padStart(2, "0")}
+          </span>
+        </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-4 gap-3">
+      <div className="mt-4 grid grid-cols-4 gap-3">
         {slots.map((src, idx) => (
           <button
             key={idx}
             type="button"
             onClick={() => setActiveIdx(idx)}
             aria-label={`Pokaż zdjęcie ${idx + 1}`}
-            className={`relative aspect-[4/3] overflow-hidden rounded-lg border transition ${
-              activeIdx === idx
-                ? "border-brand-500 ring-2 ring-brand-200"
-                : "border-graphite-100 hover:border-graphite-200"
+            aria-pressed={safeIdx === idx}
+            className={`relative aspect-[4/3] overflow-hidden rounded-md border transition-all duration-250 ease-atelier ${
+              safeIdx === idx
+                ? "border-clay shadow-card ring-1 ring-clay-soft"
+                : "border-line opacity-70 hover:border-line-strong hover:opacity-100"
             }`}
           >
             <PlotImagePlaceholder

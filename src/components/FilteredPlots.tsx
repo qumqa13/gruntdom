@@ -40,7 +40,7 @@ export function FilteredPlots({ plots }: FilteredPlotsProps) {
 
   const locations = useMemo(
     () => Array.from(new Set(plots.map((p) => p.location))).sort(),
-    [plots]
+    [plots],
   );
 
   const visible = useMemo(() => {
@@ -61,7 +61,7 @@ export function FilteredPlots({ plots }: FilteredPlotsProps) {
   }, [plots, filters]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <Filters
         filters={filters}
         locations={locations}

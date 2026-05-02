@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type {
   VisualizationGenerationResult,
   VisualizationPlotContext,
@@ -10,21 +12,75 @@ const REPLICATE_PREDICTIONS_URL = `https://api.replicate.com/v1/models/${REPLICA
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 60_000;
+const MAX_INLINE_FILE_SIZE_BYTES = 1024 * 1024;
+
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    default:
+      return "application/octet-stream";
+  }
+}
 
 /**
- * Zwraca pełny URL do zdjęcia bazowego. Jeśli klient przesłał
- * ścieżkę względną (np. /images/plots/plot-01/main.jpg),
- * prefix z NEXT_PUBLIC_APP_URL pozwala modelowi pobrać obraz.
+ * Przyjmuje ścieżkę do obrazu i przygotowuje input akceptowany przez Replicate.
+ *
+ * Priorytet:
+ * 1. URL http/https -> zwracamy bez zmian.
+ * 2. Ścieżka względna do pliku w /public -> zamieniamy na data URI.
+ *
+ * Dzięki temu Replicate nie musi pobierać zdjęcia wejściowego przez ngrok,
+ * więc znika problem 502 przy odczycie /images/plots/... z zewnętrznego URL.
+ *
+ * Oficjalna dokumentacja Replicate dopuszcza przekazywanie plików wejściowych
+ * jako data URI. Jest to rekomendowane dla plików mniejszych niż 1 MB.
  */
-function absolutizeImageUrl(imageUrl: string): string {
+async function resolveReplicateInputImage(imageUrl: string): Promise<string> {
   if (!imageUrl) return "";
+
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
-  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
-  if (!base) return imageUrl;
-  const path = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
-  return `${base}${path}`;
+
+  const normalizedPath = imageUrl.startsWith("/") ? imageUrl.slice(1) : imageUrl;
+  const absoluteFilePath = path.join(process.cwd(), "public", normalizedPath);
+
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = await fs.readFile(absoluteFilePath);
+  } catch {
+    const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+    if (!configuredBaseUrl) {
+      throw new Error(
+        `Nie znaleziono pliku bazowego dla wizualizacji: ${absoluteFilePath}`
+      );
+    }
+    const publicPath = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
+    return `${configuredBaseUrl}${publicPath}`;
+  }
+
+  if (fileBuffer.byteLength > MAX_INLINE_FILE_SIZE_BYTES) {
+    const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+    if (!configuredBaseUrl) {
+      throw new Error(
+        `Plik bazowy jest większy niż 1 MB (${Math.round(
+          fileBuffer.byteLength / 1024
+        )} KB), a NEXT_PUBLIC_APP_URL nie jest skonfigurowany.`
+      );
+    }
+    const publicPath = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
+    return `${configuredBaseUrl}${publicPath}`;
+  }
+
+  const mimeType = getMimeType(absoluteFilePath);
+  return `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
 }
 
 const MAX_THROTTLE_RETRIES = 4;
@@ -38,13 +94,11 @@ async function callReplicate(
   prompt: string,
   baseImageUrl: string
 ): Promise<string> {
-  const resolvedImage = absolutizeImageUrl(baseImageUrl);
+  const resolvedImage = await resolveReplicateInputImage(baseImageUrl);
 
   let createResponse: Response | null = null;
   let throttleAttempt = 0;
 
-  // Retry pętla dla 429 (rate limit) — Replicate na koncie z saldem < $5
-  // ma limit "burst 1", więc równoległe requesty bywają odrzucane.
   while (throttleAttempt <= MAX_THROTTLE_RETRIES) {
     createResponse = await fetch(REPLICATE_PREDICTIONS_URL, {
       method: "POST",
@@ -66,7 +120,6 @@ async function callReplicate(
 
     if (createResponse.status !== 429) break;
 
-    // Throttle: czekaj zgodnie z retry_after, a jeśli go nie ma — backoff.
     let retryAfterSec = 0;
     const retryHeader = createResponse.headers.get("retry-after");
     if (retryHeader) {
@@ -82,7 +135,6 @@ async function callReplicate(
           retryAfterSec = body.retry_after;
         }
       } catch {
-        /* ignore */
       }
     }
     const waitMs = Math.max(
@@ -101,7 +153,7 @@ async function callReplicate(
     const text = await createResponse.text().catch(() => "");
     if (createResponse.status === 429) {
       throw new Error(
-        "Replicate odrzucił request po kilku próbach (429 — limit zapytań). Doładuj $5 na Replicate, żeby podnieść limit, albo spróbuj ponownie za chwilę."
+        "Replicate odrzucił request po kilku próbach (429 - limit zapytań). Doładuj $5 na Replicate, żeby podnieść limit, albo spróbuj ponownie za chwilę."
       );
     }
     throw new Error(
@@ -117,7 +169,6 @@ async function callReplicate(
     urls?: { get?: string };
   };
 
-  // Prefer: wait mogło dać już status succeeded lub failed
   let current = prediction;
   const started = Date.now();
 
@@ -165,18 +216,15 @@ async function callReplicate(
   }
 
   if (typeof output === "string") return output;
-  if (Array.isArray(output) && output.length > 0) return output[0];
+
+  if (Array.isArray(output)) {
+    const first = output[0];
+    if (typeof first === "string" && first.length > 0) return first;
+  }
 
   throw new Error("Nieobsługiwany format wyjściowy modelu.");
 }
 
-/**
- * Główna funkcja generowania wizualizacji dla jednego wariantu.
- * - Bez REPLICATE_API_TOKEN → tryb mock (zwraca prompt + status "mock").
- * - Z tokenem → realny request do Replicate.
- * - Błędy łapiemy i zwracamy jako status "error" (nie rzucamy dalej),
- *   żeby generowanie innych wariantów mogło się dokończyć.
- */
 export async function generateVisualization(
   plot: VisualizationPlotContext,
   variant: VisualizationVariantRequest
@@ -192,7 +240,7 @@ export async function generateVisualization(
       prompt,
       outputImageUrl: null,
       message:
-        "Brak REPLICATE_API_TOKEN. To jest tryb testowy — poniżej widzisz prompt, który zostałby wysłany do modelu.",
+        "Brak REPLICATE_API_TOKEN. To jest tryb testowy - poniżej widzisz prompt, który zostałby wysłany do modelu.",
     };
   }
 

@@ -13,15 +13,31 @@ interface GeneratedVisualizationResultProps {
 }
 
 const sizeLabel: Record<"S" | "M" | "L", string> = {
-  S: "Wariant S — mniejsza zabudowa",
-  M: "Wariant M — średnia zabudowa",
-  L: "Wariant L — największa zabudowa",
+  S: "Mniejsza zabudowa",
+  M: "Średnia zabudowa",
+  L: "Większa zabudowa",
 };
 
-const sizeBadgeStyle: Record<"S" | "M" | "L", string> = {
-  S: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-  M: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-  L: "bg-graphite-100 text-graphite-800 ring-1 ring-inset ring-graphite-200",
+const statusStyles: Record<
+  VisualizationGenerationResult["status"] | "pending",
+  string
+> = {
+  idle: "border-line bg-paper-soft text-ink-body",
+  pending: "border-amber/30 bg-amber-bg text-amber-deep",
+  success: "border-moss/30 bg-moss-bg text-moss-deep",
+  mock: "border-line bg-paper-soft text-ink-body",
+  error: "border-signal/30 bg-signal-bg text-signal-deep",
+};
+
+const statusLabel: Record<
+  VisualizationGenerationResult["status"] | "pending",
+  string
+> = {
+  idle: "Oczekuje",
+  pending: "Generowanie",
+  success: "Gotowe",
+  mock: "Tryb testowy",
+  error: "Błąd",
 };
 
 function StatusBadge({
@@ -29,48 +45,56 @@ function StatusBadge({
 }: {
   status: VisualizationGenerationResult["status"] | "pending";
 }) {
-  const styles: Record<typeof status, string> = {
-    idle: "bg-graphite-100 text-graphite-700 ring-1 ring-inset ring-graphite-200",
-    pending: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-    success: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-    mock: "bg-graphite-100 text-graphite-700 ring-1 ring-inset ring-graphite-200",
-    error: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
-  };
-  const label: Record<typeof status, string> = {
-    idle: "Oczekuje",
-    pending: "Generowanie…",
-    success: "Wygenerowano",
-    mock: "Tryb testowy",
-    error: "Błąd",
-  };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] ${statusStyles[status]}`}
     >
-      {label[status]}
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          status === "success"
+            ? "bg-moss"
+            : status === "pending"
+              ? "animate-pulse bg-amber"
+              : status === "error"
+                ? "bg-signal"
+                : "bg-ink-faint"
+        }`}
+        aria-hidden
+      />
+      {statusLabel[status]}
     </span>
   );
 }
 
 function Placeholder({ variant }: { variant: VisualizationVariantRequest }) {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,_#e8f0ea,_#cfe0d5_60%,_#a7c6b4)] text-white">
-      <div className="flex flex-col items-center text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/30 backdrop-blur">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="h-6 w-6"
-          >
-            <path d="M3 10.5L12 3l9 7.5V12h-2v9h-5v-6h-4v6H5v-9H3v-1.5z" />
-          </svg>
-        </div>
-        <div className="mt-2 text-xs font-medium uppercase tracking-wider">
-          Placeholder wizualizacji
-        </div>
-        <div className="mt-0.5 text-[11px] opacity-80">
-          Wariant {variant.label} • {variant.buildingArea} m² zabudowy
+    <div className="relative flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,_#ECE7DB_0%,_#DFD9CC_50%,_#C9C2B0_100%)] text-ink-body">
+      {/* Blueprint grid */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(21,23,26,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(21,23,26,0.08) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+      <div className="relative flex flex-col items-center text-center">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-10 w-10 text-ink/60"
+        >
+          <path d="M3 11L12 3l9 8" />
+          <path d="M5 10v10h14V10" />
+          <path d="M9.5 20v-6h5v6" />
+        </svg>
+        <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-ink/70">
+          Wariant {variant.label} — {variant.buildingArea} m² zabudowy
         </div>
       </div>
     </div>
@@ -84,7 +108,7 @@ export function GeneratedVisualizationResult({
 }: GeneratedVisualizationResultProps) {
   const [copied, setCopied] = useState(false);
 
-  const status = isPending ? "pending" : result?.status ?? "idle";
+  const status = isPending ? "pending" : (result?.status ?? "idle");
 
   async function copyPrompt() {
     if (!result?.prompt) return;
@@ -98,23 +122,23 @@ export function GeneratedVisualizationResult({
   }
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-graphite-100 bg-white shadow-card">
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-graphite-100">
+    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-350 ease-atelier hover:border-line-strong hover:shadow-cardHover">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-paper-deep">
         {result?.status === "success" && result.outputImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={result.outputImageUrl}
             alt={`Wygenerowana wizualizacja — ${variant.name}`}
-            className="h-full w-full object-cover"
+            className="h-full w-full animate-fade-in object-cover transition-transform duration-700 ease-soft group-hover:scale-[1.02]"
           />
         ) : (
           <Placeholder variant={variant} />
         )}
 
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${sizeBadgeStyle[variant.label]}`}
-          >
+        <div className="absolute left-3 top-3">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-ink/80 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-paper backdrop-blur">
+            <span className="num">{variant.label}</span>
+            <span className="h-2.5 w-px bg-paper/30" aria-hidden />
             {sizeLabel[variant.label]}
           </span>
         </div>
@@ -123,63 +147,69 @@ export function GeneratedVisualizationResult({
         </div>
 
         {isPending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-sm">
-            <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-graphite-800 shadow">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-              Generowanie wizualizacji…
+          <div className="absolute inset-0 flex items-center justify-center bg-paper/50 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2.5 rounded-md border border-line bg-surface px-4 py-2.5 shadow-card">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-clay border-t-transparent" />
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink">
+                Generowanie…
+              </span>
             </div>
           </div>
         )}
       </div>
 
       <div className="flex flex-1 flex-col p-5">
-        <h4 className="text-base font-semibold text-graphite-900">
+        <h4 className="font-display text-lg leading-tight text-ink">
           {variant.name}
         </h4>
-        <p className="mt-1 text-xs uppercase tracking-wider text-graphite-500">
-          {variant.architectStudio}
+        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
+          w stylu · {variant.architectStudio}
         </p>
 
-        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <div className="rounded-md border border-graphite-100 bg-graphite-50/60 px-2 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wider text-graphite-500">
+        <dl className="mt-4 grid grid-cols-3 gap-3 border-y border-line py-3">
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.14em] text-ink-muted">
               Pow. użytk.
             </dt>
-            <dd className="mt-0.5 font-semibold text-graphite-900">
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
               {variant.usableArea} m²
             </dd>
           </div>
-          <div className="rounded-md border border-graphite-100 bg-graphite-50/60 px-2 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wider text-graphite-500">
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.14em] text-ink-muted">
               Zabudowa
             </dt>
-            <dd className="mt-0.5 font-semibold text-graphite-900">
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
               {variant.buildingArea} m²
             </dd>
           </div>
-          <div className="rounded-md border border-graphite-100 bg-graphite-50/60 px-2 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wider text-graphite-500">
+          <div>
+            <dt className="text-[10px] uppercase tracking-[0.14em] text-ink-muted">
               Wysokość
             </dt>
-            <dd className="mt-0.5 font-semibold text-graphite-900">
+            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
               {variant.height} m
             </dd>
           </div>
         </dl>
 
         {result?.status === "error" && result.error && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
-            <div className="font-semibold">Nie udało się wygenerować obrazu</div>
-            <div className="mt-0.5">{result.error}</div>
-            <div className="mt-1 text-red-700">
-              Prompt poniżej został mimo to przygotowany — możesz go skopiować i
-              użyć ręcznie.
+          <div className="mt-4 rounded-md border border-signal/30 bg-signal-bg p-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-deep">
+              Nie udało się wygenerować obrazu
             </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-signal-deep">
+              {result.error}
+            </p>
+            <p className="mt-2 text-[11px] text-signal-deep/80">
+              Prompt poniżej został mimo to przygotowany — możesz go skopiować
+              i użyć ręcznie.
+            </p>
           </div>
         )}
 
         {result?.status === "mock" && result.message && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+          <div className="mt-4 rounded-md border border-line bg-paper-soft p-3 text-xs leading-relaxed text-ink-body">
             {result.message}
           </div>
         )}
@@ -187,18 +217,34 @@ export function GeneratedVisualizationResult({
         {result?.prompt && (
           <div className="mt-4 flex flex-1 flex-col">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-graphite-500">
-                Prompt użyty do generacji
-              </span>
+              <span className="eyebrow">Prompt</span>
               <button
                 type="button"
                 onClick={copyPrompt}
-                className="inline-flex items-center gap-1 rounded-md border border-graphite-200 bg-white px-2 py-1 text-xs font-medium text-graphite-700 transition hover:border-graphite-300 hover:bg-graphite-50"
+                className="group/btn inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-body transition-all duration-200 hover:border-line-strong hover:text-ink"
               >
-                {copied ? "Skopiowano ✓" : "Kopiuj prompt"}
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3 w-3"
+                >
+                  {copied ? (
+                    <path d="M3 8.5l3 3 7-7" />
+                  ) : (
+                    <>
+                      <rect x="5" y="5" width="9" height="9" rx="1.5" />
+                      <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" />
+                    </>
+                  )}
+                </svg>
+                {copied ? "Skopiowano" : "Kopiuj"}
               </button>
             </div>
-            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-graphite-100 bg-graphite-50/70 p-3 text-[11px] leading-relaxed text-graphite-700">
+            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-line bg-paper-soft p-3 font-mono text-[10.5px] leading-relaxed text-ink-body">
               {result.prompt}
             </pre>
           </div>

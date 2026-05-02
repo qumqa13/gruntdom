@@ -7,15 +7,15 @@ interface ComplianceBadgeProps {
 }
 
 const styles: Record<ComplianceStatus, string> = {
-  compliant: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-  warning: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-  not_compliant: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
+  compliant: "border-moss/30 bg-moss-bg text-moss-deep",
+  warning: "border-amber/30 bg-amber-bg text-amber-deep",
+  not_compliant: "border-signal/30 bg-signal-bg text-signal-deep",
 };
 
 const dots: Record<ComplianceStatus, string> = {
-  compliant: "bg-brand-500",
-  warning: "bg-amber-500",
-  not_compliant: "bg-red-500",
+  compliant: "bg-moss",
+  warning: "bg-amber",
+  not_compliant: "bg-signal",
 };
 
 export function ComplianceBadge({
@@ -23,10 +23,10 @@ export function ComplianceBadge({
   size = "md",
 }: ComplianceBadgeProps) {
   const sizeCls =
-    size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm";
+    size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-3 py-1 text-xs";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-medium ${sizeCls} ${styles[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border font-mono uppercase tracking-[0.1em] ${sizeCls} ${styles[status]}`}
     >
       <span
         aria-hidden

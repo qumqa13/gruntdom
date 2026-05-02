@@ -1,27 +1,29 @@
+import { Reveal, RevealStagger, RevealStaggerItem } from "@/lib/motion";
+
 const steps = [
   {
     number: "01",
     title: "Wybierz działkę",
     description:
-      "Przeglądaj działki z kompletem informacji — lokalizacja, cena, powierzchnia, typ, status analizy.",
+      "Filtruj po lokalizacji, cenie, powierzchni i typie. Każde ogłoszenie ma rozpoznawalny status analizy — gotowa, w toku, dostępne dane.",
   },
   {
     number: "02",
-    title: "Sprawdź parametry i ograniczenia",
+    title: "Sprawdź parametry",
     description:
-      "Zapoznaj się z warunkami planistycznymi, mediami, stanem prawnym i ryzykami, które warto zweryfikować.",
+      "Warunki planistyczne, status mediów, stan prawny, due diligence i ryzyka — w czytelnej, sekcyjnej strukturze. Bez ukrytych klauzul.",
   },
   {
     number: "03",
-    title: "Zobacz przykładowe koncepcje zabudowy",
+    title: "Zobacz warianty",
     description:
-      "Trzy warianty domu — ekonomiczny, rodzinny i premium — dopasowane do konkretnych parametrów działki.",
+      "Trzy koncepcje zabudowy (ekonomiczna, rodzinna, premium) ze wstępną analizą zgodności z planem i wizualizacjami AI w realnym zdjęciu działki.",
   },
   {
     number: "04",
-    title: "Podejmij świadomą decyzję",
+    title: "Podejmij decyzję",
     description:
-      "Porównaj koncepcje z limitami planu, zweryfikuj ryzyka i umów pełną analizę z architektem lub prawnikiem.",
+      "Porównaj warianty, zweryfikuj ryzyka i umów pełną analizę z architektem lub prawnikiem. Mając dossier na stole, rozmowa idzie szybciej.",
   },
 ];
 
@@ -29,37 +31,47 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="border-y border-graphite-100 bg-graphite-50/60"
+      className="border-y border-line bg-paper-soft"
     >
-      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight text-graphite-900 sm:text-4xl">
-            Jak to działa
-          </h2>
-          <p className="mt-4 text-base leading-relaxed text-graphite-600">
-            Czterokrokowy proces, który prowadzi od zainteresowania działką do
-            wstępnej decyzji o zakupie.
-          </p>
-        </div>
-
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step) => (
-            <div
-              key={step.number}
-              className="relative rounded-xl border border-graphite-100 bg-white p-6 shadow-card transition hover:shadow-cardHover"
-            >
-              <div className="mb-4 inline-flex items-center justify-center rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-                Krok {step.number}
-              </div>
-              <h3 className="text-lg font-semibold text-graphite-900">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-graphite-600">
-                {step.description}
+      <div className="mx-auto max-w-7xl px-5 py-22 sm:px-8 lg:px-12 lg:py-30">
+        <Reveal>
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16">
+            <div className="lg:col-span-5">
+              <div className="eyebrow">Proces</div>
+              <h2 className="mt-3 font-display text-3xl leading-[1.1] tracking-tight text-ink sm:text-4xl">
+                Cztery kroki od ogłoszenia do świadomej decyzji.
+              </h2>
+              <p className="mt-6 max-w-md text-md leading-relaxed text-ink-body">
+                Zaprojektowane jak dossier inwestycyjne — żeby pierwszą rozmowę
+                z architektem albo prawnikiem zacząć od tematów istotnych, a
+                nie od podstawowych pytań.
               </p>
             </div>
-          ))}
-        </div>
+
+            <div className="lg:col-span-7">
+              <RevealStagger className="divide-y divide-line">
+                {steps.map((step) => (
+                  <RevealStaggerItem
+                    key={step.number}
+                    className="grid grid-cols-[auto_1fr] items-start gap-6 py-6 first:pt-0 last:pb-0 sm:gap-10"
+                  >
+                    <div className="num font-display text-2xl text-ink-faint">
+                      {step.number}
+                    </div>
+                    <div>
+                      <h3 className="font-display text-xl text-ink">
+                        {step.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-relaxed text-ink-body">
+                        {step.description}
+                      </p>
+                    </div>
+                  </RevealStaggerItem>
+                ))}
+              </RevealStagger>
+            </div>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

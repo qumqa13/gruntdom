@@ -2,23 +2,34 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-24 text-center sm:px-6 lg:px-8">
-      <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-        Błąd 404
+    <div className="bg-paper-grain">
+      <div className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-start justify-center px-5 py-24 sm:px-8 lg:px-12">
+        <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-clay">
+          Błąd · 404
+        </div>
+        <h1 className="mt-4 font-display text-4xl leading-[1.05] tracking-tight text-ink sm:text-5xl">
+          Nie znaleźliśmy
+          <br />
+          tej działki.
+        </h1>
+        <p className="mt-6 max-w-lg text-md leading-relaxed text-ink-body">
+          Strona, której szukasz, nie istnieje w bazie MVP albo jej slug się
+          zmienił. Wróć do listy, żeby zobaczyć dostępne oferty.
+        </p>
+        <Link href="/" className="group btn-primary mt-10">
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="h-3.5 w-3.5 transition-transform duration-250 group-hover:-translate-x-1"
+          >
+            <path d="M12.5 8h-9M7 4.5L3.5 8 7 11.5" />
+          </svg>
+          Wróć do listy działek
+        </Link>
       </div>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight text-graphite-900 sm:text-4xl">
-        Nie znaleźliśmy tej działki
-      </h1>
-      <p className="mt-3 max-w-xl text-base leading-relaxed text-graphite-600">
-        Działka, której szukasz, nie istnieje w naszej bazie MVP lub jej slug
-        się zmienił. Wróć do listy, żeby zobaczyć dostępne oferty.
-      </p>
-      <Link
-        href="/"
-        className="mt-8 inline-flex items-center justify-center rounded-md bg-brand-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700"
-      >
-        Wróć do listy działek
-      </Link>
     </div>
   );
 }

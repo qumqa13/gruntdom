@@ -10,17 +10,25 @@ interface ConceptCardProps {
 }
 
 const tierLabel: Record<Concept["tier"], string> = {
-  economic: "Wariant ekonomiczny",
-  family: "Wariant rodzinny",
-  premium: "Wariant premium",
+  economic: "Ekonomiczny",
+  family: "Rodzinny",
+  premium: "Premium",
 };
 
-const tierVariant: Record<Concept["tier"], "concept-economic" | "concept-family" | "concept-premium"> =
-  {
-    economic: "concept-economic",
-    family: "concept-family",
-    premium: "concept-premium",
-  };
+const tierMark: Record<Concept["tier"], string> = {
+  economic: "S",
+  family: "M",
+  premium: "L",
+};
+
+const tierVariant: Record<
+  Concept["tier"],
+  "concept-economic" | "concept-family" | "concept-premium"
+> = {
+  economic: "concept-economic",
+  family: "concept-family",
+  premium: "concept-premium",
+};
 
 export function ConceptCard({ plot, concept }: ConceptCardProps) {
   const result = evaluateConcept(plot, concept);
@@ -38,76 +46,95 @@ export function ConceptCard({ plot, concept }: ConceptCardProps) {
   ];
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-graphite-100 bg-white shadow-card">
-      <div className="relative aspect-[16/10] w-full">
+    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-350 ease-atelier hover:border-line-strong hover:shadow-cardHover">
+      {/* IMAGE */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-paper-deep">
         <PlotImagePlaceholder
           src={concept.image}
           alt={concept.name}
           variant={tierVariant[concept.tier]}
           label={tierLabel[concept.tier]}
           className="h-full"
+          hoverZoom
         />
+
         <div className="absolute left-3 top-3">
-          <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-graphite-800 ring-1 ring-inset ring-graphite-200 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-paper/90 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink backdrop-blur">
+            <span className="num text-ink-body">{tierMark[concept.tier]}</span>
+            <span className="h-2.5 w-px bg-line-strong" aria-hidden />
             {tierLabel[concept.tier]}
           </span>
         </div>
+
         <div className="absolute right-3 top-3">
           <ComplianceBadge status={result.overall} size="sm" />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <h3 className="text-lg font-semibold text-graphite-900">
-          {concept.name}
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-graphite-600">
-          {concept.description}
-        </p>
+      {/* CONTENT */}
+      <div className="flex flex-1 flex-col gap-5 p-6">
+        <div>
+          <h3 className="font-display text-xl leading-tight text-ink">
+            {concept.name}
+          </h3>
+          {concept.architectStudio && (
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
+              w stylu · {concept.architectStudio}
+            </p>
+          )}
+          <p className="mt-3 text-sm leading-relaxed text-ink-body">
+            {concept.description}
+          </p>
+        </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* Specs grid */}
+        <dl className="grid grid-cols-3 gap-x-4 gap-y-3 border-y border-line py-4">
           {specs.map((spec) => (
-            <div
-              key={spec.label}
-              className="rounded-lg border border-graphite-100 bg-graphite-50/60 px-3 py-2"
-            >
-              <dt className="text-[10px] uppercase tracking-wider text-graphite-500">
+            <div key={spec.label}>
+              <dt className="text-[10px] uppercase tracking-[0.14em] text-ink-muted">
                 {spec.label}
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold text-graphite-900">
+              <dd className="num mt-1 font-mono text-sm font-medium text-ink">
                 {spec.value}
               </dd>
             </div>
           ))}
         </dl>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-graphite-100 bg-white p-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-brand-700">
-              Plusy
+        {/* Pros / Limitations */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-moss" aria-hidden />
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-moss-deep">
+                Plusy
+              </span>
             </div>
-            <ul className="mt-2 space-y-1.5 text-sm text-graphite-700">
+            <ul className="mt-3 space-y-2 text-sm text-ink-body">
               {concept.pros.map((p) => (
                 <li key={p} className="flex items-start gap-2">
                   <span
                     aria-hidden
-                    className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-brand-500"
+                    className="mt-2 h-px w-2 flex-none bg-line-strong"
                   />
                   <span>{p}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-lg border border-graphite-100 bg-white p-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-700">
-              Ograniczenia
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-amber" aria-hidden />
+              <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-deep">
+                Ograniczenia
+              </span>
             </div>
-            <ul className="mt-2 space-y-1.5 text-sm text-graphite-700">
+            <ul className="mt-3 space-y-2 text-sm text-ink-body">
               {concept.limitations.map((l) => (
                 <li key={l} className="flex items-start gap-2">
                   <span
                     aria-hidden
-                    className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-amber-500"
+                    className="mt-2 h-px w-2 flex-none bg-line-strong"
                   />
                   <span>{l}</span>
                 </li>
@@ -116,9 +143,7 @@ export function ConceptCard({ plot, concept }: ConceptCardProps) {
           </div>
         </div>
 
-        <div className="mt-5">
-          <ComplianceSummary result={result} compact />
-        </div>
+        <ComplianceSummary result={result} compact />
       </div>
     </article>
   );

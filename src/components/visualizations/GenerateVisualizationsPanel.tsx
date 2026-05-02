@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PlotImagePlaceholder } from "@/components/PlotImagePlaceholder";
 import { GeneratedVisualizationResult } from "./GeneratedVisualizationResult";
 import type {
@@ -35,16 +35,10 @@ export function GenerateVisualizationsPanel({
   const hasBaseImage = Boolean(baseImageUrl);
   const hasResults = results.length > 0;
 
-  const variantsById = useMemo(() => {
-    const map = new Map<string, VisualizationVariantRequest>();
-    for (const v of variants) map.set(v.id, v);
-    return map;
-  }, [variants]);
-
   async function handleGenerate() {
     if (!hasBaseImage) {
       setError(
-        "Ta działka nie ma jeszcze zdjęcia bazowego. Dodaj główne zdjęcie działki w /public/images/plots/ i spróbuj ponownie."
+        "Ta działka nie ma jeszcze zdjęcia bazowego. Dodaj główne zdjęcie działki w /public/images/plots/ i spróbuj ponownie.",
       );
       return;
     }
@@ -71,9 +65,7 @@ export function GenerateVisualizationsPanel({
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(
-          data?.error || `Błąd serwera (${response.status}).`
-        );
+        throw new Error(data?.error || `Błąd serwera (${response.status}).`);
       }
 
       const data = (await response.json()) as GenerateVisualizationsResponse;
@@ -95,55 +87,71 @@ export function GenerateVisualizationsPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-graphite-100 bg-white p-6 shadow-card sm:p-8">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wider text-brand-700">
-            Wizualizacje AI
+    <section className="overflow-hidden rounded-lg border border-line bg-surface shadow-card">
+      {/* HEADER */}
+      <div className="border-b border-line bg-paper-soft px-6 py-7 sm:px-8 sm:py-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="num font-mono text-[11px] text-clay">10</span>
+              <div className="eyebrow">Wizualizacje AI</div>
+            </div>
+            <h3 className="mt-3 font-display text-2xl leading-tight tracking-tight text-ink sm:text-3xl">
+              Trzy warianty zabudowy w realnym zdjęciu działki
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-ink-body">
+              Model image-to-image (Flux Kontext Pro) wkomponowuje
+              projektowany dom w istniejącą fotografię terenu — z zachowaniem
+              perspektywy, oświetlenia i otoczenia. Trzy style architektoniczne
+              dopasowane do każdego wariantu (S / M / L).
+            </p>
           </div>
-          <h3 className="mt-1 text-2xl font-semibold tracking-tight text-graphite-900">
-            Generuj 3 wizualizacje dla tej działki
-          </h3>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-graphite-600">
-            Na podstawie realnego zdjęcia działki oraz parametrów 3 wariantów
-            (S / M / L) wygenerujemy koncepcyjne wizualizacje z dopasowanym
-            stylem architektonicznym. Prompty są zapisywane razem z wynikiem.
-          </p>
-        </div>
 
-        <div className="flex flex-col items-stretch gap-2 lg:flex-none">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isPending || !hasBaseImage}
-            className="inline-flex items-center justify-center rounded-md bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition enabled:hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-graphite-200 disabled:text-graphite-500"
-          >
-            {isPending ? (
-              <>
-                <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Generowanie…
-              </>
-            ) : (
-              "Generuj 3 wizualizacje"
-            )}
-          </button>
-          {mode && (
-            <span className="text-center text-xs text-graphite-500">
-              Ostatnie uruchomienie: tryb{" "}
-              <span className="font-semibold text-graphite-700">
-                {mode === "mock" ? "testowy (mock)" : "live (Replicate)"}
+          <div className="flex flex-col items-stretch gap-2 lg:flex-none lg:items-end">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isPending || !hasBaseImage}
+              className="group inline-flex items-center justify-center gap-2 rounded-md bg-ink px-6 py-3.5 text-sm font-medium text-paper transition-all duration-250 ease-atelier enabled:hover:-translate-y-0.5 enabled:hover:bg-ink-soft enabled:hover:shadow-cardHover disabled:cursor-not-allowed disabled:bg-line-strong disabled:text-ink-muted"
+            >
+              {isPending ? (
+                <>
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper border-t-transparent" />
+                  Generowanie…
+                </>
+              ) : (
+                <>
+                  Generuj 3 wizualizacje
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    className="h-3.5 w-3.5 transition-transform duration-250 group-enabled:group-hover:translate-x-1"
+                  >
+                    <path d="M3.5 8h9M9 4.5l3.5 3.5L9 11.5" />
+                  </svg>
+                </>
+              )}
+            </button>
+            {mode && (
+              <span className="text-right font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
+                Tryb:{" "}
+                <span className="text-ink">
+                  {mode === "mock" ? "testowy (mock)" : "live · Replicate"}
+                </span>
               </span>
-            </span>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      {/* BODY: image + variants */}
+      <div className="grid gap-8 px-6 py-7 sm:px-8 sm:py-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-graphite-500">
-            Zdjęcie bazowe działki
-          </div>
-          <div className="mt-2 aspect-[4/3] w-full overflow-hidden rounded-xl border border-graphite-100 bg-graphite-100">
+          <div className="eyebrow">Zdjęcie bazowe</div>
+          <div className="mt-3 aspect-[4/3] w-full overflow-hidden rounded-md border border-line bg-paper-deep">
             <PlotImagePlaceholder
               src={baseImageUrl}
               alt={`${plotTitle} — zdjęcie bazowe`}
@@ -153,9 +161,9 @@ export function GenerateVisualizationsPanel({
             />
           </div>
           {!hasBaseImage && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+            <div className="mt-3 rounded-md border border-amber/30 bg-amber-bg p-3 text-xs leading-relaxed text-amber-deep">
               Ta działka nie ma jeszcze zdjęcia bazowego. Dodaj plik do{" "}
-              <code className="rounded bg-white/70 px-1">
+              <code className="rounded bg-paper-soft px-1 font-mono text-[10px] text-ink">
                 /public/images/plots/{plotSlug}/main.jpg
               </code>
               , aby uruchomić generowanie.
@@ -164,28 +172,31 @@ export function GenerateVisualizationsPanel({
         </div>
 
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-graphite-500">
-            Warianty do wygenerowania
-          </div>
-          <ul className="mt-2 divide-y divide-graphite-100 overflow-hidden rounded-xl border border-graphite-100">
-            {variants.map((v) => (
+          <div className="eyebrow">Warianty do wygenerowania</div>
+          <ul className="mt-3 overflow-hidden rounded-md border border-line">
+            {variants.map((v, idx) => (
               <li
                 key={v.id}
-                className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 text-sm"
+                className={`flex flex-wrap items-center justify-between gap-3 bg-paper-soft px-5 py-4 ${
+                  idx > 0 ? "border-t border-line" : ""
+                }`}
               >
-                <div>
-                  <div className="font-medium text-graphite-900">
-                    Wariant {v.label} — {v.name}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center rounded-md bg-ink px-1.5 py-0.5 font-mono text-[10px] font-medium text-paper">
+                      {v.label}
+                    </span>
+                    <span className="text-sm font-medium text-ink">
+                      {v.name}
+                    </span>
                   </div>
-                  <div className="text-xs text-graphite-500">
+                  <div className="num mt-1 font-mono text-[11px] text-ink-muted">
                     {v.architectStudio} · {v.usableArea} m² użytk. ·{" "}
                     {v.buildingArea} m² zabud. · {v.height} m · {v.roofType}
                   </div>
                 </div>
-                <div className="text-xs font-medium text-graphite-600">
-                  {v.floors === 1
-                    ? "Parter"
-                    : `${v.floors} kondygnacje`}
+                <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-body">
+                  {v.floors === 1 ? "Parter" : `${v.floors} kondygnacje`}
                 </div>
               </li>
             ))}
@@ -194,23 +205,29 @@ export function GenerateVisualizationsPanel({
       </div>
 
       {error && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-relaxed text-red-800">
-          <div className="font-semibold">Coś poszło nie tak</div>
-          <div className="mt-1">{error}</div>
+        <div className="mx-6 mb-7 rounded-md border border-signal/30 bg-signal-bg p-4 sm:mx-8 sm:mb-8">
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal-deep">
+            Błąd
+          </div>
+          <p className="mt-1.5 text-sm leading-relaxed text-signal-deep">
+            {error}
+          </p>
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-graphite-100 bg-graphite-50/60 p-4 text-xs leading-relaxed text-graphite-600">
+      <div className="mx-6 mb-7 rounded-md border border-line bg-paper-soft p-4 text-xs leading-relaxed text-ink-muted sm:mx-8 sm:mb-8">
+        <span className="font-mono text-clay">→ </span>
         Generowane wizualizacje są koncepcyjne. Nie stanowią projektu
         budowlanego ani gwarancji możliwości realizacji inwestycji.
       </div>
 
       {(isPending || hasResults) && (
-        <div className="mt-8">
-          <div className="text-xs font-semibold uppercase tracking-wider text-graphite-500">
-            Wyniki generowania
+        <div className="border-t border-line bg-paper px-6 py-8 sm:px-8 sm:py-10">
+          <div className="flex items-center gap-3">
+            <div className="eyebrow">Wyniki generowania</div>
+            <div className="h-px flex-1 bg-line" aria-hidden />
           </div>
-          <div className="mt-3 grid gap-6 lg:grid-cols-3">
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
             {variants.map((variant) => (
               <GeneratedVisualizationResult
                 key={variant.id}

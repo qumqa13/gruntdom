@@ -4,57 +4,71 @@ interface RiskListProps {
   risks: Risk[];
 }
 
-const styles: Record<RiskLevel, { badge: string; dot: string; label: string }> =
-  {
-    low: {
-      badge: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
-      dot: "bg-brand-500",
-      label: "Niskie",
-    },
-    medium: {
-      badge: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
-      dot: "bg-amber-500",
-      label: "Średnie",
-    },
-    high: {
-      badge: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
-      dot: "bg-red-500",
-      label: "Wysokie",
-    },
-  };
+const styles: Record<
+  RiskLevel,
+  { dot: string; rule: string; chip: string; label: string }
+> = {
+  low: {
+    dot: "bg-moss",
+    rule: "bg-moss",
+    chip: "border-moss/30 bg-moss-bg text-moss-deep",
+    label: "Niskie",
+  },
+  medium: {
+    dot: "bg-amber",
+    rule: "bg-amber",
+    chip: "border-amber/30 bg-amber-bg text-amber-deep",
+    label: "Średnie",
+  },
+  high: {
+    dot: "bg-signal",
+    rule: "bg-signal",
+    chip: "border-signal/30 bg-signal-bg text-signal-deep",
+    label: "Wysokie",
+  },
+};
 
 export function RiskList({ risks }: RiskListProps) {
   if (risks.length === 0) {
     return (
-      <div className="rounded-2xl border border-graphite-100 bg-white p-6 text-sm text-graphite-600">
-        Nie zidentyfikowano wyraźnych ryzyk na podstawie dostępnych danych. Pełna
-        ocena wymaga weryfikacji terenowej i prawnej.
+      <div className="rounded-lg border border-line bg-surface p-8 text-sm leading-relaxed text-ink-body">
+        Nie zidentyfikowano wyraźnych ryzyk na podstawie dostępnych danych.
+        Pełna ocena wymaga weryfikacji terenowej i prawnej.
       </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-graphite-100 overflow-hidden rounded-2xl border border-graphite-100 bg-white">
-      {risks.map((risk) => {
+    <ul className="overflow-hidden rounded-lg border border-line bg-surface">
+      {risks.map((risk, idx) => {
         const s = styles[risk.level];
         return (
-          <li key={risk.title} className="flex items-start gap-4 px-5 py-4">
-            <span
-              aria-hidden
-              className={`mt-1 flex h-2.5 w-2.5 flex-none rounded-full ${s.dot}`}
-            />
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-semibold text-graphite-900">
-                  {risk.title}
-                </div>
+          <li
+            key={risk.title}
+            className={`relative flex items-start gap-5 px-6 py-5 ${
+              idx > 0 ? "border-t border-line" : ""
+            }`}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <span
+                aria-hidden
+                className={`h-2 w-2 flex-none rounded-full ${s.dot}`}
+              />
+              <span
+                aria-hidden
+                className={`h-full w-px ${s.rule} opacity-30`}
+              />
+            </div>
+            <div className="flex-1 pb-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h4 className="font-display text-md text-ink">{risk.title}</h4>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${s.badge}`}
+                  className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] ${s.chip}`}
                 >
-                  Ryzyko: {s.label}
+                  Ryzyko · {s.label}
                 </span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-graphite-600">
+              <p className="mt-2 text-sm leading-relaxed text-ink-body">
                 {risk.description}
               </p>
             </div>
