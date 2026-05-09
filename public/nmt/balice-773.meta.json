@@ -1,0 +1,45 @@
+{
+  "source": "PZGiK / GUGiK – Centralny Zasób Geodezyjny i Kartograficzny, via opendata.geoportal.gov.pl",
+  "sheet": "5.186.23.01",
+  "wfsFeatureId": "SkorowidzNMT2019.891610",
+  "wfsLayer": "gugik:SkorowidzNMT2019",
+  "wfsService": "https://mapy.geoportal.gov.pl/wss/service/PZGIK/NumerycznyModelTerenuKRON86/WFS/Skorowidze",
+  "downloadUrl": "https://opendata.geoportal.gov.pl/NumDaneWys/NMT/72980/72980_891610_5.186.23.01.asc",
+  "fileFormat": "ARC/INFO ASCII GRID (.asc)",
+  "bbox": {
+    "note": "Sheet bbox in EPSG:2176 (PL-2000:S5) from WFS feature",
+    "xMin_pl2000s5": 556871.752570,
+    "yMin_pl2000s5": 246554.292551,
+    "xMax_pl2000s5": 557959.373487,
+    "yMax_pl2000s5": 248207.699093
+  },
+  "bboxWGS84_approx": {
+    "note": "Approximate WGS84 bbox derived from PL-2000:S5 sheet extents [UNVERIFIED – no gdal available]",
+    "west": 19.7975,
+    "south": 50.0910,
+    "east": 19.8120,
+    "north": 50.1060
+  },
+  "parcelCentroid_EPSG2180": {
+    "X": 557224,
+    "Y": 247740
+  },
+  "epsg_storage": 2176,
+  "epsg_vertical": "PL-KRON86-NH",
+  "gridSpacingM": 1,
+  "ncols": 1600,
+  "nrows": 1000,
+  "xllcenter_pl2000s5": 5516000.5,
+  "yllcenter_pl2000s5": 5854000.5,
+  "nodata_value": -9999,
+  "elevationRange_m": "~58–62 (sampled from header rows; Balice plateau elevation)",
+  "dataCurrency_year": 2019,
+  "fetchedAt": "2026-05-10T00:24:10Z",
+  "fileSizeBytes": 11202107,
+  "sha256": "55b076b007c6734b34d7b7af8f330fc09082bc0be433768ae78730c7aeb0d094",
+  "licence": "Otwarte dane PZGiK – bezpłatne, wymagane podanie źródła. Ustawa Prawo geodezyjne i kartograficzne ze zmianami z 2020 r. (Dz.U. 2020 poz. 782). Brak formalnej etykiety CC; GUGiK ogłosił dane jako otwarte bez ograniczeń użytkowych.",
+  "licenceUrl": "https://www.geoportal.gov.pl/en/about-geoportal/terms-and-conditions/",
+  "licenceNotes": "Attribution required: cite 'GUGiK / Geoportal.gov.pl' as source. Data free for any purpose including commercial use per 2020 Geodetic Law amendment.",
+  "conversionNeeded": "File is ARC/INFO ASCII GRID in PL-2000:S5 (EPSG:2176). Must be converted to GeoTIFF (gdal_translate) and reprojected to EPSG:4326 or EPSG:2180 before use with cesium-terrain-builder. See docs/runbooks/pzgik-nmt-download.md.",
+  "f2Warning": "char_przestrz=1.00m confirmed. uklad_xy=PL-2000:S5 (EPSG:2176) not EPSG:2180 — centroid cross-check used WFS bbox; conversion pipeline must reproject."
+}

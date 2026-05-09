@@ -55,3 +55,10 @@ next-env.d.ts
 # OMC runtime telemetry (per-session, not project artifact)
 .omc/
 **/.omc/
+
+# F1-T0 spike artefact — large raw NMT dump in PL-2000:S5 ASCII Grid.
+# Convert + crop happens in F2-T4 (cesium-terrain-builder pipeline).
+# Do not commit raw to repo (11+MB borderline + reprojection needed first).
+public/nmt/*.asc
+public/nmt/*.xyz
+public/nmt/*.xyz.zip
