@@ -117,16 +117,18 @@ Realistic burn for F1+F2+F3 ≈ $5–10 / mc, mostly Replicate. **Alerts at 80 %
 
 ### 2.7 Secret hygiene
 
-No secrets in client bundle. Build-time grep gate in CI:
+No **server-bearer** secrets in client bundle. Build-time grep gate in CI:
 
 ```sh
 npm run build && \
-  if grep -RE 'AIza|sk-|cesium-ion|GUGiK_API_KEY' .next/static/; then
+  if grep -RE 'AIza|sk-|GUGiK_API_KEY|https://ion\.cesium\.com' .next/static/; then
     echo "secrets leaked into client bundle"; exit 1;
   fi
 ```
 
 All authenticated calls go through `apps/web/api/geoportal/*` proxies. ULDK and Geoportal WMS need no key → still proxied for cache + rate-limit hygiene.
+
+> **Cesium ION carve-out (per ADR-0005, 2026-05-10).** The bare-substring `cesium-ion` pattern was removed in favour of `https://ion.cesium.com`. ION free-tier tokens are JWTs that contain the issuer URL `https://ion.cesium.com`; that URL identifies a leaked **server-bearer** ION key on a future paid tier, but it is not present in the encoded JWT *body* of a domain-restricted free-tier token bundled by Next.js as `NEXT_PUBLIC_CESIUM_ION_TOKEN`. The variable name itself (the literal string `cesium-ion` would match) is shipped intentionally as a public env var in the client bundle and is not a secret. See ADR-0005 for the full reasoning + revisit triggers.
 
 ### 2.8 Operational constraints (Geoportal ToS compliance)
 
