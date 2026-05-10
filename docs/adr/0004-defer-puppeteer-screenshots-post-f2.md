@@ -1,6 +1,6 @@
 # ADR-0004 — Defer F1-T7 + F1-T8 (Puppeteer-driven snapshots) to post-F2
 
-- **Status**: Proposed (2026-05-10 — awaiting Oskar's review of wording, especially §5 trigger criteria)
+- **Status**: Accepted (2026-05-10 — Oskar signed off after reviewing §5 trigger criteria; F1 formally closed)
 - **Date**: 2026-05-10
 - **Decision drivers**: F1 close pressure, downstream-consumer absence, Puppeteer-infra cost-of-introduction, ADR-0002 §2.1 (T7 row), F1 plan §F1-T7 / §F1-T8.
 - **Supersedes**: none. Refines the F1 task table in `docs/plans/3d-viewer-data-layer.md`.
