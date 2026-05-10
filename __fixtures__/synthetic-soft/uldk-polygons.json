@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "description": "Synthetic ULDK fixture — parcel with ~3% area mismatch (gate=soft). Used by F1-T5 validators tests and F1-T6 worker integration tests. Coordinates in EPSG:2180 (Zabierzów gmina area). WKT area computed via shoelace: 1030.0 m². Declared area 1000 m² → diff +3.00% → gateLevel=soft.",
+    "fetchedAt": "2026-05-10",
+    "source": "synthetic",
+    "commune": "Zabierzów (gm. wiejska)",
+    "communeTeryt": "120616_2",
+    "region": "Zabierzów",
+    "regionCode": "0001"
+  },
+  "parcels": [
+    {
+      "nr": "200",
+      "teryt": "120616_2.0001.200",
+      "wkt2180": "SRID=2180;POLYGON((556200 247100,556225.75 247100,556225.75 247140,556200 247140,556200 247100))"
+    }
+  ]
+}

@@ -55,3 +55,19 @@ next-env.d.ts
 # OMC runtime telemetry (per-session, not project artifact)
 .omc/
 **/.omc/
+
+# Local disk caches (Geoportal WMS tile cache from F1-T4, future R2 fallbacks).
+# Production target is Cloudflare R2; .cache/ is dev-only and ephemeral.
+.cache/
+
+# F1-T9 ESLint demo fixture — exists only to prove the
+# `gruntdom/no-verifiable-without-provenance` rule fires correctly.
+# Never ship as production data.
+src/data/__violation-fixture*.ts
+
+# F1-T0 spike artefact — large raw NMT dump in PL-2000:S5 ASCII Grid.
+# Convert + crop happens in F2-T4 (cesium-terrain-builder pipeline).
+# Do not commit raw to repo (11+MB borderline + reprojection needed first).
+public/nmt/*.asc
+public/nmt/*.xyz
+public/nmt/*.xyz.zip

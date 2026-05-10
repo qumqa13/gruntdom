@@ -1,0 +1,9 @@
+{
+  "teryt": "120616_2.0001.300",
+  "uldkAreaM2": 900.0,
+  "declaredAreaM2": 1000,
+  "areaDiffPct": -10.0,
+  "expectedGateLevel": "hard",
+  "wkt2180": "SRID=2180;POLYGON((556300 247100,556325 247100,556325 247136,556300 247136,556300 247100))",
+  "_note": "Rectangle 25 m × 36 m = 900.0 m² (shoelace-verified). Declared 1000 m² → −10.00% → hard (>5% threshold). centroid approx EPSG:2180 [556312.5, 247118.0]. Distinct from Balice 773 (−16.36%) and synthetic-soft (+3%) so tests can differentiate gate levels."
+}

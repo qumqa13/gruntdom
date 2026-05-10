@@ -10,13 +10,14 @@ import { DueDiligenceChecklist } from "@/components/DueDiligenceChecklist";
 import { RiskList } from "@/components/RiskList";
 import { ConceptCard } from "@/components/ConceptCard";
 import { PlotMap } from "@/components/PlotMap";
+import { Plot3DView } from "@/components/3d/Plot3DView";
 import { Disclaimer } from "@/components/Disclaimer";
 import { GenerateVisualizationsPanel } from "@/components/visualizations/GenerateVisualizationsPanel";
 import { conceptsToVisualizationVariants } from "@/lib/visualizationVariants";
 import { mailtoLink } from "@/lib/config";
 import { formatPrice, formatPricePerM2 } from "@/lib/format";
 import { Reveal, RevealStagger, RevealStaggerItem } from "@/lib/motion";
-import type { AnalysisStatus } from "@/types/plot";
+import type { AnalysisStatus, PlotGeometry } from "@/types/plot";
 
 type PlotPageParams = Promise<{ slug: string }>;
 
@@ -99,6 +100,15 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
   const minBioArea = Math.round(
     (plot.area * plot.planning.minBiologicallyActiveAreaPct) / 100,
   );
+
+  // F2-T1 milestone 3 — showcase 3D viewer is gated to plots tagged
+  // `threeDDemoStatus: "showcase"` AND with a real geometry. Other plots get
+  // the 2D editorial map only; section numbering compresses to skip the
+  // empty 3D slot rather than leaving a hole in the editorial sequence.
+  const has3DShowcase =
+    plot.threeDDemoStatus === "showcase" && Boolean(plot.geometry);
+  const num = (n: number) =>
+    String(has3DShowcase ? n + 1 : n).padStart(2, "0");
 
   return (
     <div className="bg-paper">
@@ -277,9 +287,26 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
               </div>
             </Reveal>
 
+            {has3DShowcase && plot.geometry && (
+              <Reveal as="section">
+                <SectionHeading
+                  number="05"
+                  eyebrow="Teren · 3D"
+                  title="Działka w skali geograficznej"
+                  description="Pofałdowanie gruntu, kontekst lotniska Balice i sąsiedztwo widziane w katalogowych proporcjach. Polygon ULDK GUGiK osadzony na cyfrowym modelu wysokościowym Cesium World Terrain — slab podąża za zboczem N-S."
+                />
+                <div className="mt-8">
+                  <ShowcaseThreeDView
+                    geometry={plot.geometry}
+                    title={plot.title}
+                  />
+                </div>
+              </Reveal>
+            )}
+
             <Reveal as="section">
               <SectionHeading
-                number="05"
+                number={num(5)}
                 eyebrow="Plan"
                 title="Limity zabudowy z MPZP lub WZ"
                 description="Parametry pochodzące z planu miejscowego lub przyjęte na podstawie analizy urbanistycznej — przed projektem wymagają potwierdzenia w urzędzie."
@@ -294,7 +321,7 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
 
             <Reveal as="section">
               <SectionHeading
-                number="06"
+                number={num(6)}
                 eyebrow="Media"
                 title="Sieci i dojazd"
               />
@@ -305,7 +332,7 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
 
             <Reveal as="section">
               <SectionHeading
-                number="07"
+                number={num(7)}
                 eyebrow="Due diligence"
                 title="Checklista przed zakupem"
                 description="Cztery obszary, które warto zweryfikować przed decyzją o zakupie. Status jest wstępny i bazuje na danych MVP."
@@ -317,7 +344,7 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
 
             <Reveal as="section">
               <SectionHeading
-                number="08"
+                number={num(8)}
                 eyebrow="Ryzyka"
                 title="Ryzyka do weryfikacji"
                 description="Każde ryzyko warto skonsultować z prawnikiem lub specjalistą branżowym."
@@ -378,7 +405,7 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
         <div className="mx-auto max-w-7xl px-5 py-22 sm:px-8 lg:px-12 lg:py-30">
           <Reveal>
             <SectionHeading
-              number="09"
+              number={num(9)}
               eyebrow="Warianty zabudowy"
               title="Trzy koncepcje dopasowane do tej działki"
               description="Każda koncepcja porównana z limitami planu — zobaczysz, gdzie projekt mieści się bez problemu, a gdzie wymaga weryfikacji."
@@ -417,6 +444,55 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function ShowcaseThreeDView({
+  geometry,
+  title,
+}: {
+  geometry: PlotGeometry;
+  title: string;
+}) {
+  const parcelLabel = geometry.parcelNumber
+    ? `DZIAŁKA ${geometry.parcelNumber}`
+    : title;
+  return (
+    <div className="space-y-3">
+      <div className="h-[360px] w-full sm:h-[480px]">
+        <Plot3DView
+          geometry={geometry}
+          frontAzimuthDeg={geometry.frontAzimuth}
+          parcelLabel={parcelLabel}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-moss"
+            aria-hidden
+          />
+          Granice działki · ULDK GUGiK
+          {geometry.terytId && (
+            <span className="text-ink-faint"> · {geometry.terytId}</span>
+          )}
+        </span>
+        <span
+          className="hidden h-3 w-px bg-line sm:inline-block"
+          aria-hidden
+        />
+        <span>Teren · Cesium World Terrain (ION asset 1)</span>
+        <span
+          className="hidden h-3 w-px bg-line sm:inline-block"
+          aria-hidden
+        />
+        <span>Mapa · Bing Maps Aerial (ION asset 2)</span>
+      </div>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
+        Pełnoekranowy obraz dla pełnej czytelności · ortofoto Geoportal
+        zaplanowane w F2-T5
+      </p>
     </div>
   );
 }

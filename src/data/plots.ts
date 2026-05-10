@@ -1069,6 +1069,7 @@ export const plots: Plot[] = [
     ],
     plotType: "podmiejska",
     analysisStatus: "in_progress",
+    threeDDemoStatus: "showcase",
     planning: {
       // Brak MPZP/WZ przekazanego do katalogu (Scenariusz C w decyzji Oskara).
       // Wszystkie wartości to założenia typowe dla MN w okolicach Krakowa

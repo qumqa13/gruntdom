@@ -1,0 +1,41 @@
+{
+  "centroidWgs84": [
+    19.8002197,
+    50.0941582
+  ],
+  "areaM2_uldk": 710.98,
+  "areaM2_declared": 850,
+  "areaDiffPct": -16.36,
+  "bbox": {
+    "west": 19.7999833,
+    "south": 50.0940227,
+    "east": 19.8004661,
+    "north": 50.0943249
+  },
+  "cesiumCartesian3_centroid_h0": {
+    "x": 3857451.163,
+    "y": 1388784.583,
+    "z": 4869514.493
+  },
+  "boundingSphereRadiusM": 22.63,
+  "edgeLengthsM": [
+    25.02,
+    35.21,
+    6.39,
+    15.11,
+    13.94,
+    6.43,
+    7.04
+  ],
+  "edgeAzimuthsDeg": [
+    287.7,
+    197.3,
+    79.7,
+    79.7,
+    46.7,
+    29.7,
+    358.8
+  ],
+  "vertexCount": 7,
+  "_note": "Centroid + bbox in WGS84 from ULDK srid=4326. Cesium ECEF Cartesian3 at h=0; runtime should use Cesium.Cartesian3.fromDegrees(lng,lat,terrainHeight). Edge lengths in meters give plot dimensions. Front azimuth: pick edge facing road (south-facing per terrain slope from NMT). Area diff vs declared (850 m^2) triggers admin review (>5% per F1 cross-validation rule)."
+}
