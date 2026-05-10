@@ -13,6 +13,7 @@ export default defineConfig({
       "src/**/__tests__/**/*.test.ts",
       "src/**/*.test.ts",
       "__fixtures__/__tests__/**/*.test.ts",
+      "scripts/**/*.test.ts",
     ],
     coverage: {
       provider: "v8",
