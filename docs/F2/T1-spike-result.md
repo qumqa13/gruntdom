@@ -3,7 +3,7 @@
 - **Date**: 2026-05-10
 - **Branch**: `feat/3d-viewer-data-layer`
 - **Timebox**: 1 day (hard)
-- **Status**: 🟡 **partial** (milestone 1/3 — empty viewer mounts; terrain + polygon + toggle pending decision)
+- **Status**: 🟡 **partial** (milestone 2/3 — ION terrain + plot-04 polygon land; 2D/3D toggle on detail page is the last leg)
 - **Tier choice**: **Tier 2 (Cesium ION free tier)** per Oskar's F2 kick-off briefing — Tier 1 (`cesium-terrain-builder` Windows toolchain) skipped to ship MVP faster. ADR-0002 §6.3 ladder is honoured: this is an explicit Tier 1 → Tier 2 step-down with rationale captured here. Tier 3 (`EllipsoidTerrainProvider`) is **only** the milestone-1 placeholder; production ships on Tier 2 ION terrain.
 
 ## Success criteria
@@ -11,7 +11,7 @@
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
 | a | Cesium engine mounts in Next.js without SSR / build errors | ✅ pass | `next dev` → `GET /dev/3d-spike` 200, Turbopack compile clean, no console errors. Dynamic import wrapper (`ssr: false`) keeps the bundle off the server. |
-| b | Plot-04 boundary (7-vertex ULDK polygon) renders extruded ~3 m on terrain at correct centroid `[19.8002, 50.0942]` | ⏳ pending | Milestone 2. Geometry source already wired (`balice773Geometry` from `src/data/uldk/balice-773.ts`); needs ION terrain provider + `sampleTerrainMostDetailed` for ground heights. |
+| b | Plot-04 boundary (7-vertex ULDK polygon) renders extruded ~3 m on terrain at correct centroid `[19.8002, 50.0942]` | ✅ pass | Cesium ION World Terrain (asset 1) loaded via `CesiumTerrainProvider.fromIonAssetId(1)`. Polygon entity built from `balice773Geometry.boundary` (7-vertex EPSG:4326 ring), ground heights sampled with `sampleTerrainMostDetailed`, extruded `groundHeight + 0.1` → `groundHeight + 3` with clay/18 % alpha fill + 3 px outline. Camera fly: top-down → -45° pitch after 800 ms (Quartic ease-out, 1.5 s). Production build clean (15.1 s), grep gate passes. **Visual verification owed by Oskar.** |
 | c | 2D Leaflet ↔ 3D Cesium toggle works on plot-04 detail page | ⏳ pending | Milestone 3. Detail page is currently `MapPlaceholder`; toggle component scaffold not started. |
 
 ## What landed in milestone 1
@@ -27,6 +27,37 @@ Deliberately **not** in milestone 1:
 - No Cesium ION token usage. Empty viewer uses `EllipsoidTerrainProvider` (flat) + no imagery, just a dark globe.
 - No `next.config.js` webpack copy plugin. Cesium static assets pulled from `cesium.com/downloads/cesiumjs/releases/1.141/Build/Cesium/` CDN — **swap to self-hosted before production**, but acceptable for spike velocity.
 - No detail-page integration. Spike route is isolated at `/dev/3d-spike`, not linked from anywhere.
+
+## What landed in milestone 2
+
+```
+~ src/components/3d/Plot3DViewClient.tsx   ION terrain (asset 1) + sampleTerrainMostDetailed
+                                            + extruded clay polygon + camera fly-to (Quartic, 800 ms delay)
+~ docs/adr/0002-3d-viewer-and-data-layer.md §2.7 grep gate carve-out per ADR-0005
++ docs/adr/0005-cesium-ion-token-in-client-bundle.md  decision record (Path A locked in)
+~ .env.example                              CESIUM_ION_TOKEN → NEXT_PUBLIC_CESIUM_ION_TOKEN
+```
+
+**Verification record (milestone 2):**
+- `npx tsc --noEmit` → exit 0
+- `npm test` → 109/109 vitest still green (no new tests; smoke is the route compile + dev render)
+- `npm run build` → exit 0, 15.1 s, all 9 pages generated incl. `/dev/3d-spike`
+- Grep gate: `grep -RE 'cesium-ion|https://ion\.cesium\.com|AIza|sk-|GUGiK_API_KEY|REPLICATE_API_TOKEN' .next/static/` returns **zero hits**. The JWT token (`eyJhbGciOiJIUzI1NiIs…`) is in the bundle as expected (Path A by design); none of the forbidden patterns leak. Cesium SDK does not bundle `https://ion.cesium.com` as a literal string in this Next.js 16 + Turbopack build, so the carve-out turns out to be defensive — not strictly necessary for the current build, but cheap insurance against bundler/SDK changes.
+
+Deliberately still **not** in milestone 2:
+- No Geoportal ortofoto WMS imagery — uses default ION imagery (Bing Maps Aerial via asset 2). ADR-0002 §2.1 Geoportal-ortofoto-on-terrain is an F2-T5 task, post-spike.
+- No detail-page integration. Spike route still isolated at `/dev/3d-spike`. Promotion happens in milestone 3.
+- No NMT analyses (Profil terenu / Analiza widoczności). Self-compute path per autoresearch §6.2 is F2-T11.
+
+## ✅ Decision: Path A confirmed (2026-05-10)
+
+**Oskar's go-ahead**: Path A (NEXT_PUBLIC_CESIUM_ION_TOKEN, ION-direct). ADR-0005 captures the durable record. ADR-0002 §2.7 grep gate amended to forbid `https://ion.cesium.com` instead of bare `cesium-ion`. `.env.example` renamed `CESIUM_ION_TOKEN` → `NEXT_PUBLIC_CESIUM_ION_TOKEN` with usage comment.
+
+**USER-action item parked**: pre-launch token domain restriction in [ION dashboard](https://cesium.com/ion/tokens) — restrict to `*.gruntdom.pl` + Vercel preview wildcards before first public deploy. Re-flag at deploy-readiness.
+
+**F2-T2 backlog item**: server proxy `/api/cesium/*` if any of (a) traffic > 80 % free-tier, (b) provider switch to server-bearer-only token, (c) verified token-compromise incident. Not now.
+
+---
 
 ## ⚠ Decision required before milestone 2 — token routing
 
