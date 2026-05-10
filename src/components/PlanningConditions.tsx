@@ -1,4 +1,5 @@
 import type { PlanningConditions as Planning } from "@/types/plot";
+import { Disclaimer } from "./Disclaimer";
 
 interface PlanningConditionsProps {
   planning: Planning;
@@ -15,6 +16,11 @@ export function PlanningConditions({
   const minBioArea = Math.round(
     (plotArea * planning.minBiologicallyActiveAreaPct) / 100,
   );
+
+  // Działka bez MPZP/WZ — parametry są zakładane, nie potwierdzone.
+  // Pokazujemy mocniejszy alert, żeby kupujący nie pomylił safe defaults
+  // z realną treścią uchwały / decyzji.
+  const isUnverified = planning.source === "brak";
 
   const rows: {
     label: string;
@@ -55,6 +61,18 @@ export function PlanningConditions({
 
   return (
     <div className="space-y-5">
+      {isUnverified && (
+        <Disclaimer
+          variant="warning"
+          title="Parametry niepotwierdzone"
+        >
+          Działka nie ma obowiązującego MPZP ani decyzji o WZ przekazanej do
+          katalogu. Wszystkie wartości w tej sekcji są <strong>zakładane</strong>
+          {" "}na podstawie typowych parametrów dla zabudowy mieszkaniowej
+          jednorodzinnej w okolicy. Przed decyzją zakupową wymagane jest
+          uzyskanie wypisu z MPZP gminy lub decyzji o warunkach zabudowy.
+        </Disclaimer>
+      )}
       <dl className="overflow-hidden rounded-lg border border-line bg-surface">
         {rows.map((row, idx) => (
           <div

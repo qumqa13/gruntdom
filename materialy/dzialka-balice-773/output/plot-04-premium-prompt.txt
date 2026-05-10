@@ -1,0 +1,34 @@
+Architectural style: premium willa podmiejska o spokojnej, prostej bryle, wielospadowy ciemny dach, elewacja łącząca biały tynk, lokalny kamień łamany i pionowe deski drewniane (modrzew), duże przeszklenia od strony lasu, tarasowo wpisana w pofalowany teren, integralny garaż w cokole
+Stylistic reference / studio inspiration: Medusa Group.
+
+Photorealistic architectural visualization generated from the provided plot photograph.
+The base input image shows the real plot "Działka pod lasem — Balice 773 (gm. Zabierzów)" with its existing surroundings, vegetation, roads and neighbouring buildings. Preserve the exact camera angle, perspective, horizon line, daylight, seasonal context and all surrounding elements. Do not replace or substantially alter the landscape, trees, road, fences or neighbouring buildings visible in the photograph.
+
+Add a single newly designed residential house inside the plot boundaries, rendered as a realistic large (variant L) — premium family house with representative character house concept called "Willa pod lasem — wariant premium".
+
+House parameters that must be respected in the rendering:
+- Building footprint: approximately 145 m² of ground coverage (realistic scale versus plot surroundings).
+- Usable floor area: approximately 195 m².
+- Height to roof ridge: approximately 8 m.
+- Number of storeys: two storeys (ground floor + usable attic or first floor).
+- Roof: Wielospadowy 35°.
+
+Placement rules:
+- Position the house naturally within the visible plot, respecting likely setbacks from the road and neighbouring boundaries.
+- Keep the scale of the building realistic relative to people, cars, trees and neighbouring houses present in the photograph.
+- Integrate ground-level landscaping (lawn, paved driveway, simple plantings) consistent with the existing terrain and season.
+
+Terrain context to keep consistent: Teren pofalowany, ze spadkiem ok. 5–10% (do oszacowania geodezyjnie). Działka porośnięta starodrzewem (świerki) i zarośniętym podszyciem (paprocie, samosiejki). Wymaga gospodarki zielenią przed budową..
+Surroundings context to keep consistent: Bezpośrednie sąsiedztwo zabudowy jednorodzinnej w katalogowym charakterze podkrakowskim — dachy spadziste, jasne tynki, ciemne lub czerwone pokrycia dachowe. Zalesione zbocze w bliskim sąsiedztwie. Bliskość lotniska Kraków-Balice (ok. 2–3 km, do twardej weryfikacji) — element specyficzny lokalizacji..
+
+Rendering style:
+- Professional architectural photography, natural daylight, soft ambient shadows.
+- High level of material realism (render-quality textures on facade, roof, windows).
+- Neutral, slightly cinematic tone; avoid surreal colours or lens distortion.
+
+Constraints:
+- Do NOT transform this into a fantasy scene or unrealistic landscape.
+- Do NOT add extra buildings, streets, people or objects that are not already present in the base photograph beyond the single designed house and its immediate landscaping.
+- This image is a CONCEPTUAL visualization, not a construction design or legally binding project.
+
+Final reminder of the required architectural style: premium willa podmiejska o spokojnej, prostej bryle, wielospadowy ciemny dach, elewacja łącząca biały tynk, lokalny kamień łamany i pionowe deski drewniane (modrzew), duże przeszklenia od strony lasu, tarasowo wpisana w pofalowany teren, integralny garaż w cokole Studio reference: Medusa Group. The architectural language of the new building must visibly match this style, this is the most important visual goal of the rendering.

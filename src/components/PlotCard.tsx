@@ -1,5 +1,11 @@
 import Link from "next/link";
 import type { Plot, AnalysisStatus } from "@/types/plot";
+import {
+  formatArea,
+  formatPrice,
+  formatPricePerM2Short,
+  hasPriceData,
+} from "@/lib/format";
 import { PlotImagePlaceholder } from "./PlotImagePlaceholder";
 
 interface PlotCardProps {
@@ -25,20 +31,6 @@ const plotTypeLabel: Record<string, string> = {
   rezydencjonalna: "Rezydencjonalna",
   inwestycyjna: "Inwestycyjna",
 };
-
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat("pl-PL", {
-    style: "currency",
-    currency: "PLN",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatArea(m2: number): string {
-  return new Intl.NumberFormat("pl-PL", {
-    maximumFractionDigits: 0,
-  }).format(m2);
-}
 
 export function PlotCard({ plot }: PlotCardProps) {
   return (
@@ -100,7 +92,13 @@ export function PlotCard({ plot }: PlotCardProps) {
             <dt className="text-[10px] uppercase tracking-[0.16em] text-ink-muted">
               Cena
             </dt>
-            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
+            <dd
+              className={
+                hasPriceData(plot.price)
+                  ? "num mt-1 font-mono text-sm font-medium text-ink"
+                  : "mt-1 text-sm font-medium text-ink-muted"
+              }
+            >
               {formatPrice(plot.price)}
             </dd>
           </div>
@@ -116,8 +114,14 @@ export function PlotCard({ plot }: PlotCardProps) {
             <dt className="text-[10px] uppercase tracking-[0.16em] text-ink-muted">
               Cena / m²
             </dt>
-            <dd className="num mt-1 font-mono text-sm font-medium text-ink">
-              {formatArea(plot.pricePerM2)} zł
+            <dd
+              className={
+                hasPriceData(plot.pricePerM2)
+                  ? "num mt-1 font-mono text-sm font-medium text-ink"
+                  : "mt-1 font-mono text-sm font-medium text-ink-muted"
+              }
+            >
+              {formatPricePerM2Short(plot.pricePerM2)}
             </dd>
           </div>
         </dl>

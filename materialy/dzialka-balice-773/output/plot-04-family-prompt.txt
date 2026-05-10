@@ -1,0 +1,37 @@
+Architectural style: Contemporary Polish barn-style house, archetypal pitched gable, white smooth plaster facade with vertical pine wood cladding accents, dark anthracite standing-seam metal roof at 40-45 degrees, no roof overhangs, large rectangular windows with thin black frames, single chimney, simple landscaping with mown grass and gravel driveway, references: BXB Studio Wzorcowy, Beczkowski projekty stodół.
+Stylistic reference / studio inspiration: BXB Studio.
+
+Photorealistic architectural visualization generated from the provided plot photograph.
+The base input image shows the real plot "Działka pod lasem — Balice 773 (gm. Zabierzów)" with its existing surroundings, vegetation, roads and neighbouring buildings. Preserve the exact camera angle, perspective, horizon line, daylight, seasonal context and all surrounding elements. Do not replace or substantially alter the landscape, trees, road, fences or neighbouring buildings visible in the photograph.
+
+Add a single newly designed residential house inside the plot boundaries, rendered as a realistic medium (variant M) — comfortable family house house concept called "Stodoła rodzinna w drzewostanie — wariant rodzinny".
+
+House parameters that must be respected in the rendering:
+- Building footprint: approximately 110 m² of ground coverage (realistic scale versus plot surroundings).
+- Usable floor area: approximately 145 m².
+- Height to roof ridge: approximately 7.8 m.
+- Number of storeys: two storeys (ground floor + usable attic or first floor).
+- Roof: Dwuspadowy 40°.
+
+Placement rules:
+- Position the house naturally within the visible plot, respecting likely setbacks from the road and neighbouring boundaries.
+- Keep the scale of the building realistic relative to people, cars, trees and neighbouring houses present in the photograph.
+- Integrate ground-level landscaping (lawn, paved driveway, simple plantings) consistent with the existing terrain and season.
+
+Terrain context to keep consistent: Teren pofalowany, ze spadkiem ok. 5–10% (do oszacowania geodezyjnie). Działka porośnięta starodrzewem (świerki) i zarośniętym podszyciem (paprocie, samosiejki). Wymaga gospodarki zielenią przed budową..
+Surroundings context to keep consistent: Bezpośrednie sąsiedztwo zabudowy jednorodzinnej w katalogowym charakterze podkrakowskim — dachy spadziste, jasne tynki, ciemne lub czerwone pokrycia dachowe. Zalesione zbocze w bliskim sąsiedztwie. Bliskość lotniska Kraków-Balice (ok. 2–3 km, do twardej weryfikacji) — element specyficzny lokalizacji..
+
+Rendering style:
+- Professional architectural photography, natural daylight, soft ambient shadows.
+- High level of material realism (render-quality textures on facade, roof, windows).
+- Neutral, slightly cinematic tone; avoid surreal colours or lens distortion.
+
+Constraints:
+- Do NOT transform this into a fantasy scene or unrealistic landscape.
+- Do NOT add extra buildings, streets, people or objects that are not already present in the base photograph beyond the single designed house and its immediate landscaping.
+- This image is a CONCEPTUAL visualization, not a construction design or legally binding project.
+
+Style anti-patterns — the designed house must NOT look like:
+- no decorative columns, no balustrades, no bay windows, no Mediterranean roof tiles, no plastic panels, no 1990s Polish kostka
+
+Final reminder of the required architectural style: Contemporary Polish barn-style house, archetypal pitched gable, white smooth plaster facade with vertical pine wood cladding accents, dark anthracite standing-seam metal roof at 40-45 degrees, no roof overhangs, large rectangular windows with thin black frames, single chimney, simple landscaping with mown grass and gravel driveway, references: BXB Studio Wzorcowy, Beczkowski projekty stodół. Studio reference: BXB Studio. The architectural language of the new building must visibly match this style, this is the most important visual goal of the rendering.

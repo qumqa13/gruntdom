@@ -2,18 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllPlotSlugs, getPlotBySlug } from "@/data/plots";
-import { PlotGallery } from "@/components/PlotGallery";
+import { PlotGalleryMap } from "@/components/PlotGalleryMap";
 import { PlotParameters } from "@/components/PlotParameters";
 import { PlanningConditions } from "@/components/PlanningConditions";
 import { UtilitiesSection } from "@/components/UtilitiesSection";
 import { DueDiligenceChecklist } from "@/components/DueDiligenceChecklist";
 import { RiskList } from "@/components/RiskList";
 import { ConceptCard } from "@/components/ConceptCard";
-import { MapPlaceholder } from "@/components/MapPlaceholder";
+import { PlotMap } from "@/components/PlotMap";
 import { Disclaimer } from "@/components/Disclaimer";
 import { GenerateVisualizationsPanel } from "@/components/visualizations/GenerateVisualizationsPanel";
 import { conceptsToVisualizationVariants } from "@/lib/visualizationVariants";
 import { mailtoLink } from "@/lib/config";
+import { formatPrice, formatPricePerM2 } from "@/lib/format";
 import { Reveal, RevealStagger, RevealStaggerItem } from "@/lib/motion";
 import type { AnalysisStatus } from "@/types/plot";
 
@@ -52,20 +53,6 @@ const analysisDot: Record<AnalysisStatus, string> = {
   in_progress: "bg-amber",
   available: "bg-ink-faint",
 };
-
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat("pl-PL", {
-    style: "currency",
-    currency: "PLN",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatPricePerM2(value: number): string {
-  return `${new Intl.NumberFormat("pl-PL", {
-    maximumFractionDigits: 0,
-  }).format(value)} zł/m²`;
-}
 
 function SectionHeading({
   eyebrow,
@@ -213,13 +200,21 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
             <Reveal as="section">
               <SectionHeading
                 number="01"
-                eyebrow="Galeria"
-                title="Zdjęcia i ujęcia"
+                eyebrow="Działka i lokalizacja"
+                title="Zdjęcia z miejscem na mapie"
+                description={
+                  plot.photoViewpoints && plot.photoViewpoints.length > 0
+                    ? "Każde zdjęcie ma przypięty numerowany punkt na mapie katastralnej (warstwy GUGiK). Klikaj zdjęcia lub punkty żeby zobaczyć, z którego miejsca działki został zrobiony kadr."
+                    : "Galeria zdjęć z terenu. Pozycje na mapie pojawią się po dodaniu współrzędnych."
+                }
               />
               <div className="mt-8">
-                <PlotGallery
+                <PlotGalleryMap
                   mainImage={plot.mainImage}
                   gallery={plot.gallery}
+                  viewpoints={plot.photoViewpoints}
+                  geometry={plot.geometry}
+                  parcelNumber={plot.geometry?.parcelNumber}
                   title={plot.title}
                 />
               </div>
@@ -268,12 +263,17 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
             <Reveal as="section">
               <SectionHeading
                 number="04"
-                eyebrow="Lokalizacja"
-                title="Mapa i kontekst"
-                description="Mapa poglądowa — integracja z Google Maps / Mapbox planowana w kolejnym etapie."
+                eyebrow="Orientacja"
+                title="Działka w skali editorial"
+                description="Czysty, desaturowany rzut Atelier — pomaga uchwycić proporcje i kierunek frontu działki bez katastralnego szumu z poprzedniej sekcji."
               />
               <div className="mt-8">
-                <MapPlaceholder location={plot.location} />
+                <PlotMap
+                  geometry={plot.geometry}
+                  label={`Działka ${plot.geometry?.parcelNumber ?? plot.slug.replace(/^dzialka-/, "").replace(/-/g, " ")}`}
+                  title={plot.title}
+                  location={plot.location}
+                />
               </div>
             </Reveal>
 

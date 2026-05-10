@@ -8,11 +8,11 @@
  */
 
 export const SITE = {
-  name: "Gruntdom",
+  name: "Plotview",
   /** Public contact address shown in mailto: links and CTAs. */
-  contactEmail: "kontakt@gruntdom.example",
+  contactEmail: "kontakt@plotview.example",
   /** Default subject prefix for incoming inquiries. */
-  contactSubjectPrefix: "[Gruntdom] ",
+  contactSubjectPrefix: "[Plotview] ",
 } as const;
 
 export function mailtoLink(subject?: string): string {

@@ -8,6 +8,15 @@ export interface FilterState {
   price: "all" | "upto500" | "500to1000" | "above1000";
   plotType: "all" | PlotType;
   analysisStatus: "all" | AnalysisStatus;
+  /**
+   * Czy w wynikach pokazywać też działki bez podanej ceny (`price === 0`)?
+   * Domyślnie ON — nowe oferty często wchodzą do katalogu z ceną "do uzgodnienia"
+   * i muszą być widoczne od razu. Toggle dalej pozwala je ukryć kupującemu,
+   * który chce filtrować wyłącznie po cenie liczbowej.
+   * Działa NIEZALEŻNIE od pola `price` (range): jeśli włączony, "bez ceny"
+   * zawsze są widoczne (ignoruje range); jeśli wyłączony — zawsze ukryte.
+   */
+  includeNoPrice: boolean;
 }
 
 export const defaultFilters: FilterState = {
@@ -16,6 +25,7 @@ export const defaultFilters: FilterState = {
   price: "all",
   plotType: "all",
   analysisStatus: "all",
+  includeNoPrice: true,
 };
 
 interface FiltersProps {
@@ -83,7 +93,8 @@ export function Filters({
     filters.area !== "all" ||
     filters.price !== "all" ||
     filters.plotType !== "all" ||
-    filters.analysisStatus !== "all";
+    filters.analysisStatus !== "all" ||
+    filters.includeNoPrice !== false;
 
   return (
     <div className="rounded-lg border border-line bg-surface p-6 shadow-card sm:p-7">
@@ -201,8 +212,22 @@ export function Filters({
         </FilterField>
       </div>
 
-      {hasActiveFilters && (
-        <div className="mt-6 flex justify-end border-t border-line pt-5">
+      <div className="mt-6 flex flex-col gap-4 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-ink-body select-none">
+          <input
+            type="checkbox"
+            checked={filters.includeNoPrice}
+            onChange={(e) => update("includeNoPrice", e.target.checked)}
+            className="h-4 w-4 cursor-pointer rounded border-line-strong text-clay focus:ring-clay-soft"
+          />
+          <span>
+            Pokaż też działki bez podanej ceny
+            <span className="ml-1 text-ink-muted">
+              (oznaczone „Cena do uzgodnienia")
+            </span>
+          </span>
+        </label>
+        {hasActiveFilters && (
           <button
             type="button"
             onClick={onReset}
@@ -220,8 +245,8 @@ export function Filters({
             </svg>
             Wyczyść filtry
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
