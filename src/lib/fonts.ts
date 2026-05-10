@@ -1,25 +1,36 @@
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import {
+  Anton,
+  Big_Shoulders_Stencil,
+  Inter,
+  JetBrains_Mono,
+} from "next/font/google";
 
 /**
- * Atelier typography stack — loaded via next/font/google so they are
- * self-hosted, hashed and preloaded automatically (no FOIT, no third-party
- * cookies from Google Fonts CDN).
+ * Typography stack — loaded via next/font so files are self-hosted, hashed
+ * and preloaded automatically (no FOIT, no third-party cookies).
  *
- * - Fraunces: editorial serif for display (variable, optical-size axis).
+ * - Anton: heavy condensed display sans for the logotype and in-page
+ *   headlines. Single weight (400).
+ * - Big Shoulders Stencil Display: geometric stencil display used ONLY on
+ *   the hero banner H1 via `font-hero` Tailwind utility. Free-commercial
+ *   substitute for SEA SPRAY (Tropical Type) until/unless the licensed OTF
+ *   is purchased and dropped at `src/fonts/SeaSpray-Regular.otf`.
  * - Inter: body and UI (variable).
- * - JetBrains Mono: numeric data — KW numbers, prices, areas, coordinates.
- *
- * NOTE: next/font requires that for variable fonts using `axes`, `weight`
- * must be omitted (the variable font already covers the full range). The
- * Tailwind font weight utilities (font-medium, font-semibold, etc.) still
- * work because the variable font fulfils all CSS weight requests.
+ * - JetBrains Mono: numeric data (KW, prices, areas, coords).
  */
 
-export const fontDisplay = Fraunces({
+export const fontDisplay = Anton({
   subsets: ["latin", "latin-ext"],
   variable: "--font-display",
   display: "swap",
-  axes: ["opsz", "SOFT"],
+  weight: "400",
+});
+
+export const fontHero = Big_Shoulders_Stencil({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-hero",
+  display: "swap",
+  weight: ["500", "700", "800", "900"],
 });
 
 export const fontSans = Inter({
@@ -34,4 +45,4 @@ export const fontMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const fontVariables = `${fontDisplay.variable} ${fontSans.variable} ${fontMono.variable}`;
+export const fontVariables = `${fontDisplay.variable} ${fontHero.variable} ${fontSans.variable} ${fontMono.variable}`;

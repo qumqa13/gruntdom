@@ -1,18 +1,23 @@
 {
-  "name": "gruntdom",
+  "name": "plotview",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "validate:images": "node scripts/validate-plot-images.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
     "framer-motion": "^12.38.0",
+    "leaflet": "^1.9.4",
     "next": "^16.2.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
     "zod": "^4.4.2"
   },
   "devDependencies": {

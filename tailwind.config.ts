@@ -92,6 +92,7 @@ const config: Config = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
+        hero: ["var(--font-hero)", "var(--font-display)", "Georgia", "serif"],
         sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
         mono: [
           "var(--font-mono)",
@@ -154,10 +155,17 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "loader-progress": {
+          "0%": { transform: "scaleX(0)" },
+          "60%": { transform: "scaleX(0.7)" },
+          "100%": { transform: "scaleX(1)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) both",
         shimmer: "shimmer 2s linear infinite",
+        "loader-progress":
+          "loader-progress 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards",
       },
     },
   },

@@ -9,17 +9,22 @@ interface PlotGalleryProps {
   title: string;
 }
 
-const SLOT_COUNT = 4;
+// Minimalna liczba slotów — gdy zdjęć jest mniej, dolewamy puste placeholdery,
+// żeby siatka miniatur nie wyglądała na uciętą. Gdy jest więcej — galeria
+// pokazuje wszystkie (kluczowe dla działek z bogatym materiałem zdjęciowym
+// jak Balice 773, gdzie mamy ~18 zdjęć terenowych).
+const MIN_SLOTS = 4;
 
 export function PlotGallery({ mainImage, gallery, title }: PlotGalleryProps) {
   const images = [mainImage, ...gallery].filter(Boolean) as string[];
+  const slotCount = Math.max(images.length, MIN_SLOTS);
   const slots: (string | undefined)[] = Array.from(
-    { length: SLOT_COUNT },
+    { length: slotCount },
     (_, i) => images[i],
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
-  const safeIdx = Math.min(activeIdx, SLOT_COUNT - 1);
+  const safeIdx = Math.min(activeIdx, slotCount - 1);
   const activeSrc = slots[safeIdx];
 
   return (
@@ -45,12 +50,12 @@ export function PlotGallery({ mainImage, gallery, title }: PlotGalleryProps) {
           </span>
           <span className="text-paper/60">/</span>
           <span className="num text-paper/60">
-            {String(SLOT_COUNT).padStart(2, "0")}
+            {String(slotCount).padStart(2, "0")}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-4 gap-3">
+      <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
         {slots.map((src, idx) => (
           <button
             key={idx}

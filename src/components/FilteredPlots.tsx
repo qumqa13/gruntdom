@@ -22,8 +22,29 @@ function matchesArea(plot: Plot, area: FilterState["area"]): boolean {
   }
 }
 
-function matchesPrice(plot: Plot, price: FilterState["price"]): boolean {
-  switch (price) {
+/**
+ * Logika dopasowania ceny przy uwzględnieniu działek bez podanej ceny.
+ *
+ * Dwa wymiary niezależne:
+ *  - `priceRange` (`upto500` / `500to1000` / `above1000` / `all`) — filtruje
+ *    działki Z podaną ceną.
+ *  - `includeNoPrice` (boolean) — czy działki BEZ ceny (`price === 0`)
+ *    są w wynikach. Toggle jest zawsze brany pod uwagę, niezależnie od range.
+ *
+ * Reguły:
+ *  - `price === 0` (brak ceny): widoczna tylko gdy `includeNoPrice === true`,
+ *    niezależnie od `priceRange`.
+ *  - `price > 0`: widoczna gdy mieści się w `priceRange`.
+ */
+function matchesPrice(
+  plot: Plot,
+  priceRange: FilterState["price"],
+  includeNoPrice: boolean,
+): boolean {
+  if (plot.price <= 0) {
+    return includeNoPrice;
+  }
+  switch (priceRange) {
     case "upto500":
       return plot.price <= 500_000;
     case "500to1000":
@@ -55,7 +76,7 @@ export function FilteredPlots({ plots }: FilteredPlotsProps) {
       )
         return false;
       if (!matchesArea(p, filters.area)) return false;
-      if (!matchesPrice(p, filters.price)) return false;
+      if (!matchesPrice(p, filters.price, filters.includeNoPrice)) return false;
       return true;
     });
   }, [plots, filters]);

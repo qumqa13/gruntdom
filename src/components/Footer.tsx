@@ -11,13 +11,13 @@ export function Footer() {
             <Link
               href="/"
               className="group inline-flex items-center gap-3"
-              aria-label="Gruntdom — strona główna"
+              aria-label="Plotview — strona główna"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-md bg-ink text-paper">
-                <span className="font-display text-lg leading-none">G</span>
+                <span className="font-display text-lg leading-none">P</span>
               </span>
               <span className="font-display text-2xl tracking-tight text-ink">
-                Gruntdom
+                Plotview
               </span>
             </Link>
             <p className="mt-6 max-w-md text-base leading-relaxed text-ink-body">
@@ -26,7 +26,7 @@ export function Footer() {
               notariusz i urząd.
             </p>
             <a
-              href={mailtoLink("Pytanie o Gruntdom")}
+              href={mailtoLink("Pytanie o Plotview")}
               className="group mt-6 inline-flex items-center gap-2 text-sm font-medium text-ink transition-colors hover:text-clay"
             >
               <span className="font-mono text-xs text-ink-muted">→</span>
@@ -58,7 +58,7 @@ export function Footer() {
 
         <div className="mt-16 flex flex-col gap-3 border-t border-line pt-6 text-xs text-ink-muted sm:flex-row sm:items-center sm:justify-between">
           <div className="num">
-            © {new Date().getFullYear()} Gruntdom. Wersja MVP — prezentacja
+            © {new Date().getFullYear()} Plotview. Wersja MVP — prezentacja
             koncepcji produktu.
           </div>
           <div className="flex items-center gap-2">

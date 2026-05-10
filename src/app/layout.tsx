@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { ScrollProgress } from "@/components/ScrollProgress";
 import { fontVariables } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: {
-    default: "Gruntdom — zobacz, co naprawdę możesz wybudować na działce",
-    template: "%s · Gruntdom",
+    default: "Plotview — zobacz, co naprawdę możesz wybudować na działce",
+    template: "%s · Plotview",
   },
   description:
     "Działki z pełną analizą potencjału zabudowy: warunki planistyczne, koncepcje domów dopasowane do parametrów działki i wizualizacje AI wkomponowane w realne zdjęcie terenu.",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
   openGraph: {
-    title: "Gruntdom",
+    title: "Plotview",
     description:
       "Zobacz, co naprawdę możesz wybudować na konkretnej działce. Parametry, ograniczenia, warianty zabudowy i wizualizacje AI.",
     type: "website",
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="pl" className={fontVariables}>
       <body className="flex min-h-screen flex-col bg-paper font-sans text-ink">
+        <ScrollProgress />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

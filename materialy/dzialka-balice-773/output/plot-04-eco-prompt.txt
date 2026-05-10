@@ -1,0 +1,37 @@
+Architectural style: Traditional Polish suburban family house from a popular catalog series, light beige plaster facade with red brick clinker accents around windows and base, two-storey body with usable attic, symmetrical dwuspadowy roof at 35-40 degrees in dark grey ceramic tile, classic rectangular windows with white PVC frames, modest entrance porch with two pillars, paved driveway, neat trimmed lawn, mature shrubs along boundary, references: Z500 Z200, Archon, Lipinscy domy.
+Stylistic reference / studio inspiration: Z500.
+
+Photorealistic architectural visualization generated from the provided plot photograph.
+The base input image shows the real plot "Działka pod lasem — Balice 773 (gm. Zabierzów)" with its existing surroundings, vegetation, roads and neighbouring buildings. Preserve the exact camera angle, perspective, horizon line, daylight, seasonal context and all surrounding elements. Do not replace or substantially alter the landscape, trees, road, fences or neighbouring buildings visible in the photograph.
+
+Add a single newly designed residential house inside the plot boundaries, rendered as a realistic small (variant S) — compact family house, lean footprint house concept called "Dom parterowy podleśny — wariant ekonomiczny".
+
+House parameters that must be respected in the rendering:
+- Building footprint: approximately 88 m² of ground coverage (realistic scale versus plot surroundings).
+- Usable floor area: approximately 78 m².
+- Height to roof ridge: approximately 5.8 m.
+- Number of storeys: single-storey.
+- Roof: Dwuspadowy 40°.
+
+Placement rules:
+- Position the house naturally within the visible plot, respecting likely setbacks from the road and neighbouring boundaries.
+- Keep the scale of the building realistic relative to people, cars, trees and neighbouring houses present in the photograph.
+- Integrate ground-level landscaping (lawn, paved driveway, simple plantings) consistent with the existing terrain and season.
+
+Terrain context to keep consistent: Teren pofalowany, ze spadkiem ok. 5–10% (do oszacowania geodezyjnie). Działka porośnięta starodrzewem (świerki) i zarośniętym podszyciem (paprocie, samosiejki). Wymaga gospodarki zielenią przed budową..
+Surroundings context to keep consistent: Bezpośrednie sąsiedztwo zabudowy jednorodzinnej w katalogowym charakterze podkrakowskim — dachy spadziste, jasne tynki, ciemne lub czerwone pokrycia dachowe. Zalesione zbocze w bliskim sąsiedztwie. Bliskość lotniska Kraków-Balice (ok. 2–3 km, do twardej weryfikacji) — element specyficzny lokalizacji..
+
+Rendering style:
+- Professional architectural photography, natural daylight, soft ambient shadows.
+- High level of material realism (render-quality textures on facade, roof, windows).
+- Neutral, slightly cinematic tone; avoid surreal colours or lens distortion.
+
+Constraints:
+- Do NOT transform this into a fantasy scene or unrealistic landscape.
+- Do NOT add extra buildings, streets, people or objects that are not already present in the base photograph beyond the single designed house and its immediate landscaping.
+- This image is a CONCEPTUAL visualization, not a construction design or legally binding project.
+
+Style anti-patterns — the designed house must NOT look like:
+- no minimalist concrete bunkers, no flat roofs, no shou sugi ban, no Scandinavian black timber
+
+Final reminder of the required architectural style: Traditional Polish suburban family house from a popular catalog series, light beige plaster facade with red brick clinker accents around windows and base, two-storey body with usable attic, symmetrical dwuspadowy roof at 35-40 degrees in dark grey ceramic tile, classic rectangular windows with white PVC frames, modest entrance porch with two pillars, paved driveway, neat trimmed lawn, mature shrubs along boundary, references: Z500 Z200, Archon, Lipinscy domy. Studio reference: Z500. The architectural language of the new building must visibly match this style, this is the most important visual goal of the rendering.
