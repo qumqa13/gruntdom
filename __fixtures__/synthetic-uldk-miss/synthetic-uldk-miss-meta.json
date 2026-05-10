@@ -1,0 +1,9 @@
+{
+  "requestedTeryt": "120616_2.0001.999999",
+  "commune": "Zabierzów (gm. wiejska)",
+  "communeTeryt": "120616_2",
+  "regionCode": "0001",
+  "expectedError": "UldkNotFoundError",
+  "responseFile": "not-found-response.txt",
+  "_note": "ULDK wire-protocol: line 1 = status code '1' (error), line 2 = Polish error message, trailing newline. Response body is byte-identical to what fetchParcelByTeryt receives from real ULDK on a parcel-not-found. The classifyUldkErrorMessage() function matches 'nie istnieje' and throws UldkNotFoundError. Load via fs.readFile(__dirname + '/not-found-response.txt', 'utf8') in tests."
+}

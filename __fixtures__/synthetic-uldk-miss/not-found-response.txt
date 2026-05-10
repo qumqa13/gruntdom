@@ -1,0 +1,2 @@
+1
+Działka o podanym identyfikatorze nie istnieje w bazie danych
