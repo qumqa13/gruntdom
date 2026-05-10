@@ -1,0 +1,19 @@
+# Line-ending discipline for the repo.
+# Source / config / docs / data → LF (Unix-style) regardless of host OS.
+# Windows-only shell scripts keep CRLF so cmd.exe / PowerShell parse them.
+#
+# Rationale: this is a Next.js / TypeScript project routinely opened from
+# both Windows and macOS / Linux worktrees (see also gruntdom-3d-viewer and
+# gruntdom-docs-adr siblings). Without this file, Windows checkouts pick up
+# core.autocrlf=true and rewrite every file to CRLF on checkout, producing
+# noisy diffs against the LF-stored blobs and tripping `diff -rq` between
+# worktrees. With `* text=auto eol=lf`, every text file is normalised to LF
+# on commit and checked out as LF on every OS.
+* text=auto eol=lf
+
+# Windows shell scripts intentionally keep CRLF — required by cmd.exe /
+# PowerShell parsers; running them with LF endings causes "command not
+# recognized" failures on Windows.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
