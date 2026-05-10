@@ -70,3 +70,28 @@ export const PROVENANCE_BADGE_STYLE: Record<DataProvenanceTrust, string> = {
   low: "amber",
   none: "amber-warning",
 };
+
+/**
+ * Cross-validation gate per ADR-0002 §2.5:
+ *   "ok"   ≤2% delta — silent merge
+ *   "soft" 2-5% delta — seller-accept flow
+ *   "hard" >5% delta — admin review block
+ *
+ * Boundary policy is symmetric: |delta| is what's compared, so over- and
+ * under-claims trip the same gate (under-claim is also a fraud signal —
+ * eg. seller lowering area to look cheaper per m²).
+ */
+export type GateLevel = "ok" | "soft" | "hard";
+
+/**
+ * Common shape every concrete validator returns. Specific validators
+ * (`AreaValidationResult`, future `ShapeValidationResult`,
+ * `MpzpRoofValidationResult`, ...) extend this so the F1-T6 worker can
+ * merge a list of `CrossValidationResult[]` into a single per-plot
+ * publish-gate decision without per-validator branching.
+ */
+export interface CrossValidationResult {
+  gateLevel: GateLevel;
+  /** Human-readable summary suitable for admin-review UI / Sentry context. */
+  message: string;
+}
