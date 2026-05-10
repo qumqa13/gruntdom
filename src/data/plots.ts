@@ -1,4 +1,35 @@
-import type { Plot } from "@/types/plot";
+import type { Plot, PhotoViewpoint } from "@/types/plot";
+import { balice773Geometry } from "./uldk/balice-773";
+
+/**
+ * Generuje radialnie rozłożone pozycje kamer wokół centroidu działki.
+ * Heading każdej kamery skierowany jest do środka (kamera „patrzy" na działkę).
+ *
+ * Używane w trybie placeholder, póki nie ma realnych pozycji GPS ze zdjęć
+ * (np. z EXIF lub ręcznie ułożonych przez Oskara). Zawsze opisuj miejsca
+ * jako przybliżone (`geometry.source === "approx"` na poziomie geometrii
+ * propaguje znacznik widoczny na mapie).
+ */
+function generateRadialViewpoints(
+  center: [number, number],
+  count: number,
+  distanceMeters = 22,
+): PhotoViewpoint[] {
+  const lat = center[1];
+  const dLat = distanceMeters / 111_000;
+  const dLng =
+    distanceMeters / (111_000 * Math.cos((lat * Math.PI) / 180));
+  return Array.from({ length: count }, (_, i) => {
+    const angleRad = (i * 360) / count * (Math.PI / 180);
+    return {
+      position: [
+        center[0] + Math.sin(angleRad) * dLng,
+        center[1] + Math.cos(angleRad) * dLat,
+      ] as [number, number],
+      heading: ((i * 360) / count + 180) % 360,
+    };
+  });
+}
 
 export const plots: Plot[] = [
   {
@@ -945,6 +976,413 @@ export const plots: Plot[] = [
         architectStudio: "JEMS Architekci",
         styleDescription:
           "rezydencja premium w ukryciu drzew, bryła wielospadowa o spokojnych proporcjach, elewacja łącząca jasny tynk, naturalny kamień, drewno i stal kortenową, panoramiczne przeszklenia wychodzące na las",
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // plot-04 — Balice 773 (gm. Zabierzów). Pierwsza prawdziwa działka wciągnięta
+  // ze zdjęć terenowych + e-mapy katastralnej + ULDK GUGiK (95-min spike,
+  // 2026-05-09, branch feat/3d-viewer-data-layer).
+  //
+  // GEOMETRIA + AREA + DIMENSIONS są ULDK truth — patrz `./uldk/balice-773.ts`.
+  // PLANNING + PRICE pozostają safe defaults — wymagają MPZP gm. Zabierzów + KW.
+  // Patrz materialy/dzialka-balice-773/{inventory,extracted-data,cross-reference}.md
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: "plot-04",
+    slug: "dzialka-balice-773",
+    title: "Działka pod lasem — Balice 773 (gm. Zabierzów)",
+    location: "Balice, gmina Zabierzów",
+    region: "woj. małopolskie",
+    // Działka 773 — czeka na potwierdzenie ceny od sprzedającego.
+    // Konwencja: `price === 0` = brak danych, UI renderuje "Cena do uzgodnienia".
+    // Po otrzymaniu: zaktualizuj `price` + `pricePerM2` i przełącz `analysisStatus` na "ready".
+    price: 0,
+    pricePerM2: 0,
+    // ULDK GUGiK 2026-05-09: 710.98 m² — placeholder oferty było 850 m² (-16.4% off).
+    area: 711,
+    dimensions: {
+      // ULDK polygon to nieregularny 7-bok, nie prostokąt. Width/depth
+      // przybliżamy dwoma najdłuższymi krawędziami dla porównywalności
+      // z innymi działkami w katalogu.
+      width: 25,
+      depth: 35,
+      description:
+        "Działka nieregularna, 7 boków: 25.0 / 35.2 / 6.4 / 15.1 / 13.9 / 6.4 / 7.0 m. Powierzchnia 711 m² wg ULDK GUGiK (2026-05-09).",
+    },
+    shape:
+      "Nieregularny 7-bok, dłuższa oś N-S (~35 m), front od wschodu (~25 m). Geometria z ULDK GUGiK.",
+    terrain:
+      "Teren pofalowany, ze spadkiem ok. 5–10% (do oszacowania geodezyjnie). Działka porośnięta starodrzewem (świerki) i zarośniętym podszyciem (paprocie, samosiejki). Wymaga gospodarki zielenią przed budową.",
+    surroundings:
+      "Bezpośrednie sąsiedztwo zabudowy jednorodzinnej w katalogowym charakterze podkrakowskim — dachy spadziste, jasne tynki, ciemne lub czerwone pokrycia dachowe. Zalesione zbocze w bliskim sąsiedztwie. Bliskość lotniska Kraków-Balice (ok. 2–3 km, do twardej weryfikacji) — element specyficzny lokalizacji.",
+    description:
+      "Pofalowana, zalesiona działka w spokojnej, podmiejskiej okolicy gminy Zabierzów. Charakter parceli wyraźnie różni się od typowej, równej działki katalogowej — pofalowanie, drzewostan i zarośnięcie wymagają przemyślanej gospodarki, ale dają jednocześnie potencjał na bardziej kontekstualną architekturę dopasowaną do zbocza i lasu. Dojazd asfaltową drogą gminną. Geometria, granice i powierzchnia pochodzą z bazy ULDK GUGiK i są weryfikowalne — kliknij plakietkę źródła, aby zobaczyć dane oryginalne.",
+    whyItMakesSense: [
+      "Spokojna lokalizacja podmiejska z zachowanym drzewostanem i widokami na zalesione zbocze.",
+      "Bliskość węzłów drogowych (Balice/A4) i lotniska Kraków-Balice — wygodny dojazd do Krakowa.",
+      "Pofalowanie terenu pozwala na ciekawą kompozycję bryły z poziomami / strefą wejścia poniżej.",
+    ],
+    // ULDK GUGiK truth — TERYT 120616_2.0002.773, fetched 2026-05-09.
+    // Polygon to nieregularny 7-bok (nie placeholder prostokąt). Dane w
+    // src/data/uldk/balice-773.ts — single source of truth do czasu F1
+    // workera fetch-plot-data, który weryfikuje na schedulerze.
+    geometry: {
+      center: balice773Geometry.centroidWgs84,
+      boundary: balice773Geometry.boundary,
+      frontAzimuth: balice773Geometry.frontAzimuthDeg,
+      source: "uldk",
+      parcelNumber: balice773Geometry.parcelNumber,
+      terytId: balice773Geometry.terytId,
+      fetchedAt: balice773Geometry.fetchedAt,
+    },
+    // 18 viewpoints = 1 main + 3 gallery + 14 photo-NN. Indeks zgodny z
+    // [mainImage, ...gallery]. Pozycje GENEROWANE radialnie wokół centroidu
+    // ULDK — do zastąpienia realnymi GPS-ami po dodaniu EXIF lub ręcznym
+    // mapowaniu zdjęć w terenie. (Centroid był wcześniej 2.2 km off; ULDK
+    // przesunął viewpoints na poprawne miejsce, sam pattern radialny zostaje.)
+    photoViewpoints: generateRadialViewpoints(
+      balice773Geometry.centroidWgs84,
+      18,
+      22,
+    ),
+    mainImage: "/images/plots/dzialka-balice-773/main.jpg",
+    gallery: [
+      "/images/plots/dzialka-balice-773/gallery-1.jpg",
+      "/images/plots/dzialka-balice-773/gallery-2.jpg",
+      "/images/plots/dzialka-balice-773/gallery-3.jpg",
+      "/images/plots/dzialka-balice-773/photo-01.jpg",
+      "/images/plots/dzialka-balice-773/photo-02.jpg",
+      "/images/plots/dzialka-balice-773/photo-03.jpg",
+      "/images/plots/dzialka-balice-773/photo-04.jpg",
+      "/images/plots/dzialka-balice-773/photo-05.jpg",
+      "/images/plots/dzialka-balice-773/photo-06.jpg",
+      "/images/plots/dzialka-balice-773/photo-07.jpg",
+      "/images/plots/dzialka-balice-773/photo-08.jpg",
+      "/images/plots/dzialka-balice-773/photo-09.jpg",
+      "/images/plots/dzialka-balice-773/photo-10.jpg",
+      "/images/plots/dzialka-balice-773/photo-11.jpg",
+      "/images/plots/dzialka-balice-773/photo-12.jpg",
+      "/images/plots/dzialka-balice-773/photo-13.jpg",
+      "/images/plots/dzialka-balice-773/photo-14.jpg",
+    ],
+    plotType: "podmiejska",
+    analysisStatus: "in_progress",
+    planning: {
+      // Brak MPZP/WZ przekazanego do katalogu (Scenariusz C w decyzji Oskara).
+      // Wszystkie wartości to założenia typowe dla MN w okolicach Krakowa
+      // (Zielonki, Zabierzów, Liszki, Wielka Wieś). UI renderuje
+      // <Disclaimer variant="warning"> dla `source === "brak"`.
+      // Patrz materialy/dzialka-balice-773/extracted-data.md sekcja 2.
+      landUse:
+        "Zabudowa mieszkaniowa jednorodzinna (parametry zakładane — wymaga weryfikacji)",
+      source: "brak",
+      maxBuildingCoveragePct: 30,
+      minBiologicallyActiveAreaPct: 50,
+      maxHeight: 9,
+      roofGeometry:
+        "Dach skośny 30–45°, kolor ciemny (założenie typowe dla MN w okolicy Krakowa)",
+      buildingLine:
+        "Nieprzekraczalna linia zabudowy 6 m od drogi (założenie)",
+      maxFloors: 2,
+      additionalConstraints: [
+        "⚠ PARAMETRY ZAKŁADANE — niepotwierdzone w MPZP/WZ",
+        "Wymagany wypis z MPZP lub decyzja WZ przed decyzją zakupową",
+        "Wymagane sprawdzenie strefy ograniczeń wysokościowych powiązanych z lotniskiem Kraków-Balice (powierzchnie podejścia, OLS-y)",
+      ],
+    },
+    utilities: {
+      electricity: {
+        available: false,
+        note: "Linia napowietrzna w pasie drogi widoczna na zdjęciach — wymaga wystąpienia o warunki przyłączenia",
+      },
+      water: {
+        available: false,
+        note: "Wymaga weryfikacji u gestora (gmina Zabierzów / Wodociągi Krakowskie)",
+      },
+      gas: {
+        available: false,
+        note: "Wymaga sprawdzenia obecności sieci PGNiG / wystąpienia o warunki techniczne",
+      },
+      sewage: {
+        available: false,
+        note: "Wymaga sprawdzenia obecności kanalizacji gminnej; alternatywa przydomowa oczyszczalnia / szczelny zbiornik",
+      },
+      internet: {
+        available: false,
+        note: "Wymaga sprawdzenia operatorów (zwykle dostępne LTE/5G + częsty światłowód w okolicach Balic)",
+      },
+      road: {
+        available: true,
+        note: "Dojazd drogą gminną asfaltową — utrzymanie całoroczne",
+      },
+    },
+    dueDiligence: [
+      {
+        title: "Planowanie i przeznaczenie",
+        items: [
+          {
+            label: "MPZP / WZ",
+            description:
+              "Wymagana weryfikacja zapisów MPZP gm. Zabierzów dla obrębu Balice",
+            status: "to_check",
+          },
+          {
+            label: "Przeznaczenie terenu",
+            description:
+              "Wstępnie zakładane MN (zabudowa mieszkaniowa jednorodzinna) — do potwierdzenia z mapy MPZP",
+            status: "to_check",
+          },
+          {
+            label: "Dopuszczalna zabudowa",
+            description:
+              "Parametry zabudowy (% zabudowy, wysokość, kondygnacje, dach) do potwierdzenia z planu",
+            status: "to_check",
+          },
+          {
+            label: "Linia zabudowy",
+            description: "Do określenia z planu lub decyzji o WZ",
+            status: "to_check",
+          },
+          {
+            label: "Strefa lotniska Kraków-Balice",
+            description:
+              "Wymagana weryfikacja stref ograniczeń wysokościowych (powierzchnie podejścia, OLS-y) — może istotnie obniżyć dopuszczalną wysokość",
+            status: "risk",
+          },
+        ],
+      },
+      {
+        title: "Stan prawny",
+        items: [
+          {
+            label: "Numer Księgi Wieczystej",
+            description:
+              "Niepodany przez sprzedającego. Przed zakupem sprawdź obciążenia, hipoteki i status własności w EKW (ekw.ms.gov.pl) lub przez notariusza.",
+            status: "to_check",
+          },
+          {
+            label: "Hipoteki i obciążenia",
+            description:
+              "Wymagane sprawdzenie w KW przed transakcją (dział IV).",
+            status: "to_check",
+          },
+          {
+            label: "Status współwłasności",
+            description:
+              "Wymagane potwierdzenie u sprzedającego (dział II KW).",
+            status: "to_check",
+          },
+          {
+            label: "Służebności drogowe",
+            description:
+              "Sprawdź dział III KW — zwłaszcza dla działek z dojazdem przez działki sąsiednie.",
+            status: "to_check",
+          },
+          {
+            label: "Dostęp prawny do drogi",
+            description:
+              "Bezpośredni dostęp z drogi gminnej widoczny na e-mapie i zdjęciach.",
+            status: "verified",
+          },
+        ],
+      },
+      {
+        title: "Warunki zabudowy",
+        items: [
+          {
+            label: "Wypis z MPZP",
+            description:
+              "Parametry w katalogu są zakładane na podstawie typowych wartości dla MN w okolicy. Wymagana weryfikacja u sprzedającego przed zakupem.",
+            status: "to_check",
+          },
+        ],
+      },
+      {
+        title: "Technika i grunt",
+        items: [
+          {
+            label: "Badania geotechniczne",
+            description:
+              "Wskazane ze względu na pofalowanie terenu i bliskość lasu — typowe dla strefy podgórskiej",
+            status: "to_check",
+          },
+          {
+            label: "Spadki terenu",
+            description:
+              "Spadek ok. 5–10% widoczny na zdjęciach — wymaga oszacowania geodezyjnego",
+            status: "to_check",
+          },
+          {
+            label: "Strefy zalewowe",
+            description:
+              "Wymaga sprawdzenia w mapach zagrożenia powodziowego ISOK",
+            status: "to_check",
+          },
+          {
+            label: "Drzewa do wycinki",
+            description:
+              "Liczne samosiejki i podszyt — gospodarka zielenią zgodnie z ustawą o ochronie przyrody",
+            status: "to_check",
+          },
+          {
+            label: "Linie energetyczne",
+            description:
+              "Linia napowietrzna w pasie drogi widoczna na zdjęciu (gallery-2)",
+            status: "risk",
+          },
+          {
+            label: "Rowy i cieki wodne",
+            description:
+              "Brak widocznych cieków na zdjęciach — do zweryfikowania na mapie zasadniczej",
+            status: "to_check",
+          },
+        ],
+      },
+      {
+        title: "Media i infrastruktura",
+        items: [
+          {
+            label: "Warunki przyłączenia",
+            description:
+              "Brak — do wystąpienia u gestorów (prąd, woda, kanalizacja, gaz, internet)",
+            status: "to_check",
+          },
+          {
+            label: "Odległość mediów",
+            description:
+              "Sieć energetyczna obecna w pasie drogi; pozostałe media wymagają weryfikacji",
+            status: "to_check",
+          },
+          {
+            label: "Kanalizacja / szambo",
+            description:
+              "Do sprawdzenia obecności kanalizacji gminnej; alternatywa: oczyszczalnia przydomowa lub szczelny zbiornik",
+            status: "to_check",
+          },
+          {
+            label: "Jakość dojazdu",
+            description: "Asfalt, droga gminna utrzymywana całorocznie",
+            status: "verified",
+          },
+        ],
+      },
+    ],
+    risks: [
+      {
+        title: "Brak zweryfikowanych zapisów MPZP/WZ",
+        description:
+          "Cała sekcja planning na ten moment to safe defaults — przed jakąkolwiek decyzją inwestycyjną wymaga konfrontacji z obowiązującym planem.",
+        level: "high",
+      },
+      {
+        title: "Strefa lotniska Kraków-Balice",
+        description:
+          "Możliwe ograniczenia wysokościowe i hałas — wymaga zweryfikowania w MPZP i dokumentacji portu.",
+        level: "high",
+      },
+      {
+        title: "Linia energetyczna napowietrzna w pasie drogi",
+        description:
+          "Może ograniczać projektowanie elewacji frontowej i strefy wejścia, oraz wymagać przebudowy.",
+        level: "medium",
+      },
+      {
+        title: "Pofalowanie terenu i drzewostan",
+        description:
+          "Wpływa na koszty fundamentów, niwelacji i gospodarki zielenią — istotnie powyżej kosztów na działce równinnej.",
+        level: "medium",
+      },
+      {
+        title: "Brak warunków przyłączeń",
+        description:
+          "Koszty i terminy mediów wymagają wystąpienia o warunki techniczne — w okolicy zwykle dostępne, ale niezweryfikowane.",
+        level: "medium",
+      },
+    ],
+    concepts: [
+      {
+        id: "plot-04-eco",
+        name: "Dom parterowy podleśny — wariant ekonomiczny",
+        tier: "economic",
+        usableArea: 78,
+        buildingArea: 88,
+        height: 5.8,
+        roofType: "Dwuspadowy 40°",
+        floors: 1,
+        estimatedBiologicallyActiveAreaPct: 65,
+        description:
+          "Kompaktowy dom parterowy, dopasowany skalą do otoczenia drzew i pofalowanego terenu. Bryła z dwuspadowym dachem o ciemnym pokryciu, wkomponowana w teren bez agresywnej niwelacji.",
+        pros: [
+          "Najniższy koszt budowy i utrzymania",
+          "Łatwa adaptacja projektu katalogowego do zbocza",
+          "Maksimum ogrodu i drzewostanu w użytku",
+        ],
+        limitations: [
+          "Mała powierzchnia użytkowa (3 sypialnie maks.)",
+          "Wymaga staranniejszego posadowienia ze względu na spadek",
+        ],
+        image: "/images/plots/dzialka-balice-773/concept-1.jpg",
+        architectStudio: "Z500",
+        styleDescription:
+          "klasyczny katalogowy dom parterowy, jasny tynk z drewnianymi akcentami przy wejściu, ciemny dach dwuspadowy ceramiczny, niewielkie zadaszenie wejścia, wpisany w drzewostan świerków",
+        styleId: "pl-catalog-classic",
+      },
+      {
+        id: "plot-04-family",
+        name: "Stodoła rodzinna w drzewostanie — wariant rodzinny",
+        tier: "family",
+        usableArea: 145,
+        buildingArea: 110,
+        height: 7.8,
+        roofType: "Dwuspadowy 40°",
+        floors: 2,
+        estimatedBiologicallyActiveAreaPct: 60,
+        description:
+          "Współczesna stodoła z poddaszem użytkowym, ciemny dach na rąbek, jasny tynk z drewnianymi akcentami, duże przeszklenia od strony lasu. Spokojna bryła rezonująca z otaczającym drzewostanem.",
+        pros: [
+          "Bryła naturalnie wpisująca się w pofalowany teren",
+          "Dobry stosunek powierzchni użytkowej do kosztu budowy",
+          "Charakter premium za rozsądną cenę",
+        ],
+        limitations: [
+          "Strome poddasze wymaga starannej izolacji",
+          "Wnętrza poddasza ze skosami",
+        ],
+        image: "/images/plots/dzialka-balice-773/concept-2.jpg",
+        architectStudio: "BXB Studio",
+        styleDescription:
+          "współczesna polska stodoła w drzewostanie, biały tynk z pionową okładziną drewnianą, ciemny dach standing-seam metalowy, prostopadłościenne proporcje archetypowe, duże przeszklenia od ogrodu",
+        styleId: "polish-barn",
+      },
+      {
+        id: "plot-04-premium",
+        name: "Willa pod lasem — wariant premium",
+        tier: "premium",
+        usableArea: 195,
+        buildingArea: 145,
+        height: 8.0,
+        roofType: "Wielospadowy 35°",
+        floors: 2,
+        estimatedBiologicallyActiveAreaPct: 55,
+        description:
+          "Reprezentacyjna, dwukondygnacyjna willa z dachem wielospadowym, łącząca jasny tynk, lokalny kamień łamany i drewno modrzewiowe. Strefa dzienna otwarta na zalesione zbocze, integralny garaż wykorzystujący spadek terenu.",
+        pros: [
+          "Maksymalne wykorzystanie potencjału pofalowanej działki",
+          "Duża powierzchnia użytkowa w granicach MPZP",
+          "Architektura kontekstualna do otoczenia lasu",
+        ],
+        limitations: [
+          "Wyższy koszt fundamentów ze względu na spadek",
+          "Wymaga indywidualnego projektu — projekty katalogowe nie dopasowują się do pofalowanego terenu",
+        ],
+        image: "/images/plots/dzialka-balice-773/concept-3.jpg",
+        architectStudio: "Medusa Group",
+        styleDescription:
+          "premium willa podmiejska o spokojnej, prostej bryle, wielospadowy ciemny dach, elewacja łącząca biały tynk, lokalny kamień łamany i pionowe deski drewniane (modrzew), duże przeszklenia od strony lasu, tarasowo wpisana w pofalowany teren, integralny garaż w cokole",
+        // brak `styleId` — żaden z istniejących presetów nie reprezentuje
+        // premium pitched-roof villa wymaganej przez safe-default MPZP. Opis w fallback fields.
       },
     ],
   },

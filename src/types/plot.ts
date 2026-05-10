@@ -60,6 +60,50 @@ export interface Risk {
   level: RiskLevel;
 }
 
+export interface PhotoViewpoint {
+  /** Pozycja kamery w WGS84 [lng, lat] (konwencja GeoJSON). */
+  position: [number, number];
+  /** Azymut spojrzenia kamery (0=N, 90=E). Opcjonalny — dla "stożka widoku". */
+  heading?: number;
+  /** Krótki opis miejsca, np. "Wjazd z drogi", "Róg pn-zach". */
+  label?: string;
+}
+
+export interface PlotGeometry {
+  /** Centroid działki w WGS84 [lng, lat] — do centrowania mapy. */
+  center: [number, number];
+  /**
+   * Polygon granic w WGS84, ring zamknięty (pierwszy punkt = ostatni).
+   * Para współrzędnych w kolejności [lng, lat] zgodnie z konwencją GeoJSON.
+   */
+  boundary: Array<[number, number]>;
+  /** Opcjonalny azymut frontu działki (od północy, w stopniach). */
+  frontAzimuth?: number;
+  /**
+   * Czy geometria pochodzi z dokładnego źródła (np. ULDK), czy jest
+   * szacunkiem na podstawie centroidu i przybliżonych wymiarów.
+   * Mapa rysuje warstwę "approx" inaczej (przerywany obrys, etykieta).
+   */
+  source?: "uldk" | "manual" | "approx";
+  /**
+   * Numer ewidencyjny działki — pokazywany w callout na mapie katastralnej.
+   * Zwykle TERYT-style "obreb/numer" lub samo "773".
+   */
+  parcelNumber?: string;
+  /**
+   * Pełny TERYT identyfikator działki w formacie GUS:
+   * `{gminaTeryt}_{typ}.{obrebNr}.{dzialkaNr}` (np. `120616_2.0002.773`).
+   * Wymagany gdy `source === "uldk"`. Klucz idempotentny dla workera
+   * `fetch-plot-data` w F1 — re-fetch tej samej działki nadpisuje cache.
+   */
+  terytId?: string;
+  /**
+   * ISO timestamp ostatniego pobrania danych z ULDK / e-mapy.
+   * Renderuje się w plakietce źródła obok geometrii (F3).
+   */
+  fetchedAt?: string;
+}
+
 export interface Concept {
   id: string;
   name: string;
@@ -113,4 +157,11 @@ export interface Plot {
   dueDiligence: DueDiligenceGroup[];
   risks: Risk[];
   concepts: Concept[];
+  geometry?: PlotGeometry;
+  /**
+   * Pozycje kamer dla każdego zdjęcia w `[mainImage, ...gallery]`.
+   * Indeks i odpowiada `images[i]`. Tablica może być krótsza niż `images`
+   * — zdjęcia bez viewpoint nie dostają markera na mapie.
+   */
+  photoViewpoints?: PhotoViewpoint[];
 }
