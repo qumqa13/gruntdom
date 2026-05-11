@@ -102,6 +102,22 @@ const WHEEL_INERTIA_ZOOM = 0.93;
 // well above that floor).
 const LIGHTING_FADE_OUT_DISTANCE_M = 0;
 const LIGHTING_FADE_IN_DISTANCE_M = 1;
+// ADR-0006 M2.6 C2 — cartographic rake-light angles. Azimuth is
+// measured clockwise from north (so 315° = NW), altitude is degrees
+// above horizon. Values are FIXED, not real-time — editorial
+// cartographic convention, the same low-angle NW rake every paper-map
+// hillshade has used since the 19th century. NW is the perceptual
+// default in Western map-reading: top-lit-from-upper-left reads as
+// "raised", bottom-lit-from-lower-right inverts the relief and reads
+// as "carved in". 30° altitude gives shadows long enough to cue
+// relief without crushing low slopes. Seasonal invariance is the
+// feature: a plot's read of "this side is steep, that side is gentle"
+// shouldn't depend on what time of day the buyer happens to load the
+// page. Phase A M6 (sun position & shadows analysis) will override
+// this light with a real-time sun for the shadow-analysis primitive
+// — until then `scene.light` is M2.6's editorial rake.
+const SUN_AZIMUTH_DEG = 315;
+const SUN_ALTITUDE_DEG = 30;
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -332,6 +348,46 @@ export function Plot3DViewClient({
       v.scene.globe.enableLighting = true;
       v.scene.globe.lightingFadeOutDistance = LIGHTING_FADE_OUT_DISTANCE_M;
       v.scene.globe.lightingFadeInDistance = LIGHTING_FADE_IN_DISTANCE_M;
+      // M2.6 C2 — cartographic rake light. SUN_AZIMUTH_DEG /
+      // SUN_ALTITUDE_DEG describe where the light SOURCE sits relative
+      // to a local tangent-plane at the plot (azimuth clockwise from
+      // north, altitude above horizon). Cesium's `DirectionalLight`
+      // expects the world-space direction the light TRAVELS (opposite
+      // of the source bearing), so we build the source vector in the
+      // plot's local East-North-Up frame, lift it to ECEF via
+      // `eastNorthUpToFixedFrame` (rotation-only — `multiplyByPointAsVector`
+      // drops translation), then negate + normalize. Recomputed once
+      // per mount because the ENU basis depends on the plot's lat/lng;
+      // a fixed ECEF vector would point in different local directions
+      // for different plots, which would break the editorial "NW-rake"
+      // promise across Phase A.5's mass-replication step.
+      const sunAzRad = Cesium.Math.toRadians(SUN_AZIMUTH_DEG);
+      const sunAltRad = Cesium.Math.toRadians(SUN_ALTITUDE_DEG);
+      const [plotLng, plotLat] = geometry.center;
+      const plotCenterCartesian = Cesium.Cartesian3.fromDegrees(
+        plotLng,
+        plotLat,
+      );
+      const enuToFixed = Cesium.Transforms.eastNorthUpToFixedFrame(
+        plotCenterCartesian,
+      );
+      const enuSunSource = new Cesium.Cartesian3(
+        Math.sin(sunAzRad) * Math.cos(sunAltRad),
+        Math.cos(sunAzRad) * Math.cos(sunAltRad),
+        Math.sin(sunAltRad),
+      );
+      const ecefSunSource = Cesium.Matrix4.multiplyByPointAsVector(
+        enuToFixed,
+        enuSunSource,
+        new Cesium.Cartesian3(),
+      );
+      const lightTravelDirection = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.negate(ecefSunSource, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3(),
+      );
+      v.scene.light = new Cesium.DirectionalLight({
+        direction: lightTravelDirection,
+      });
       // M2.5-D — viewer launches inert so wheel events pass through to
       // page scroll. The click-to-interact overlay flips `isActive`,
       // which a sibling useEffect mirrors onto enableInputs. Reading
