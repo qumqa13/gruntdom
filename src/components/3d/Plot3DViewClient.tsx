@@ -129,6 +129,18 @@ const SUN_ALTITUDE_DEG = 30;
 // visual ack.
 const CESIUM_OSM_BUILDINGS_ION_ASSET_ID = 96188;
 const BUILDINGS_TINT_RGBA = "rgba(228, 218, 196, 0.88)";
+// ADR-0006 M2.7 C4 — CartoDB Voyager streets-only labels overlay.
+// The `voyager_only_labels` style (vs the regular `voyager` basemap)
+// strips out the basemap fill and keeps only the road network +
+// place labels with the editorial CartoDB palette — clean overlay
+// shape that composites cleanly above the Geoportal ORTO base.
+// Free for non-commercial use under CartoDB's terms; attribution
+// surfaces in the M2.7 plakietka caption row.
+const CARTODB_STREETS_URL =
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png";
+const CARTODB_STREETS_SUBDOMAINS = ["a", "b", "c", "d"];
+const CARTODB_STREETS_MAX_LEVEL = 19;
+const CARTODB_STREETS_OPACITY = 0.55;
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -502,6 +514,24 @@ export function Plot3DViewClient({
           label: "Cesium OSM Buildings",
           sourceId: `ION ${CESIUM_OSM_BUILDINGS_ION_ASSET_ID}`,
         },
+      });
+
+      // M2.7 C4 — CartoDB Voyager streets-only labels overlay.
+      // Subtle ink-and-clay road network sits above the Geoportal
+      // ORTO base at 0.55 opacity so the imagery stays readable
+      // underneath. Anchors urban context without dominating.
+      layerRegistry.add({
+        id: "streets-balice",
+        name: "Ulice",
+        visible: true,
+        geometry: {
+          kind: "raster",
+          urlTemplate: CARTODB_STREETS_URL,
+          subdomains: CARTODB_STREETS_SUBDOMAINS,
+          maximumLevel: CARTODB_STREETS_MAX_LEVEL,
+        },
+        style: { color: "#000000", opacity: CARTODB_STREETS_OPACITY },
+        source: { label: "CartoDB Voyager", sourceId: "OSM" },
       });
 
       // M2.7 — dispatch by `layer.geometry.kind` rather than calling
