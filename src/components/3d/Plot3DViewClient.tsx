@@ -50,6 +50,19 @@ const NMT_TILESET_NAME = "balice";
 const CLAY_HEX = "#b54a2c";
 const PAPER_HEX = "#f4eedf";
 const POLYGON_EXTRUDE_M = 3;
+// ADR-0006 M2.5-A — visualization-only multiplier applied to the rendered
+// terrain. Polish NMT GRID1 has 1 m × 1 m source data but the Małopolska
+// relief around Balice (StdDev ≈ 30.9 m over a 3 km × 3 km mosaic) reads
+// almost flat at the catalogue's default top-down → 45° flyby framing.
+// `Scene.verticalExaggeration` (Cesium ≥ 1.110; replaces the deprecated
+// `Globe.terrainExaggeration`) doubles the rendered Z without touching the
+// underlying heightmap — `sampleTerrainMostDetailed` still returns true
+// metres, so any future Phase A M7 measurement tooling stays truth-faithful
+// to the NMT. The provenance plakietka on the plot page discloses this
+// visualization choice. Camera-positioning math below multiplies the raw
+// sampled ground height by the same factor so the camera lands above the
+// exaggerated surface instead of being buried inside it.
+const VERTICAL_EXAGGERATION = 2.0;
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -192,6 +205,8 @@ export function Plot3DViewClient({
 
       v.scene.backgroundColor = Cesium.Color.fromCssColorString(PAPER_HEX);
       v.scene.globe.show = true;
+      // M2.5-A — visual relief boost; see VERTICAL_EXAGGERATION rationale.
+      v.scene.verticalExaggeration = VERTICAL_EXAGGERATION;
 
       const ringForSampling = geometry.boundary.slice(0, -1);
       const flatRing: number[] = [];
@@ -262,8 +277,13 @@ export function Plot3DViewClient({
       }
 
       const [cLng, cLat] = geometry.center;
+      // Camera destinations are absolute WGS84 — Cesium does NOT scale them
+      // by verticalExaggeration. Multiply the raw sampled ground height by
+      // the same factor so setView/flyTo land above the exaggerated terrain
+      // rather than inside it. (relativeHeight default 0 → rendered = raw × ex.)
+      const renderedGroundHeight = cameraGroundHeight * VERTICAL_EXAGGERATION;
       const initialAlt =
-        cameraGroundHeight + Math.max(boundingSphereRadiusM * 6, 200);
+        renderedGroundHeight + Math.max(boundingSphereRadiusM * 6, 200);
       v.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(cLng, cLat, initialAlt),
         orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
@@ -272,7 +292,7 @@ export function Plot3DViewClient({
       flyTimer = setTimeout(() => {
         if (disposed || !viewer) return;
         const flyAlt =
-          cameraGroundHeight + Math.max(boundingSphereRadiusM * 4, 120);
+          renderedGroundHeight + Math.max(boundingSphereRadiusM * 4, 120);
         const offsetMeters = Math.max(boundingSphereRadiusM * 3, 80);
         // ~111 km per latitude degree — convert metres to delta-lat for camera offset.
         const offsetLat = -offsetMeters / 111_000;
