@@ -23,6 +23,10 @@ import { useEffect, useRef } from "react";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
+import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
+import { plotLayerIdForTerytId } from "@/lib/overlays/plotLayerId";
+import { renderPolygonOverlay } from "@/lib/overlays/renderers/polygonRenderer";
+import type { OverlayDisposer } from "@/lib/overlays/types";
 import { getTerrainStorage } from "@/lib/terrain/storage";
 
 import type { Plot3DViewProps } from "./Plot3DView";
@@ -49,7 +53,6 @@ const NMT_TILESET_NAME = "balice";
 
 const CLAY_HEX = "#b54a2c";
 const PAPER_HEX = "#f4eedf";
-const POLYGON_EXTRUDE_M = 3;
 // ADR-0006 M2.5-A — visualization-only multiplier applied to the rendered
 // terrain. Polish NMT GRID1 has 1 m × 1 m source data but the Małopolska
 // relief around Balice (StdDev ≈ 30.9 m over a 3 km × 3 km mosaic) reads
@@ -109,6 +112,7 @@ export function Plot3DViewClient({
     let disposed = false;
     let viewer: { destroy: () => void } | null = null;
     let flyTimer: ReturnType<typeof setTimeout> | null = null;
+    const overlayDisposers: OverlayDisposer[] = [];
 
     (async () => {
       const Cesium = await import("cesium");
@@ -208,44 +212,51 @@ export function Plot3DViewClient({
       // M2.5-A — visual relief boost; see VERTICAL_EXAGGERATION rationale.
       v.scene.verticalExaggeration = VERTICAL_EXAGGERATION;
 
+      // ringForSampling — open ring (no closing duplicate) consumed by
+      // the camera-height sampling block below. The overlay renderer
+      // accepts the closed boundary directly and handles deduplication.
       const ringForSampling = geometry.boundary.slice(0, -1);
-      const flatRing: number[] = [];
-      for (const [lng, lat] of ringForSampling) {
-        flatRing.push(lng, lat);
-      }
 
-      // Polygon: terrain-following slab via Cesium's heightReference enum.
-      //   base  = CLAMP_TO_GROUND       → per-vertex base clamped to terrain
-      //   top   = RELATIVE_TO_GROUND    → per-vertex top 3 m above ground
-      // Net: slab follows the slope on both faces with a uniform 3 m thickness.
-      // This replaces the milestone-2 single-uniform-height extrusion that
-      // produced a levitating flat-bottomed box on Balice 773's N-S slope.
+      // ADR-0006 M2.5-B — plot boundary as a terrain-draped overlay,
+      // replacing the M2 extruded slab. The LayerRegistry holds the
+      // declarative config (semantic id, visible flag, style, source)
+      // and the polygon renderer paints a ClassificationType.TERRAIN
+      // fill plus a ground-clamped clay outline and a subtle drape-glow
+      // halo. Polygon classification drapes onto the
+      // (verticalExaggeration-aware) NMT mesh so the outline folds
+      // with the relief instead of levitating above it.
       //
-      // `height: 0` is required alongside `heightReference: CLAMP_TO_GROUND`
-      // for Cesium to honour the height-reference enum on a polygon entity
-      // — without it Cesium logs "Entity ... with heightReference must also
-      // have a defined height. heightReference will be ignored" and the
-      // base falls back to ellipsoid altitude, manifesting as a floating
-      // "stamp" instead of a terrain-clamped slab. Surfaced during the M2
-      // C3 visual ack on Balice 773.
-      const clay = Cesium.Color.fromCssColorString(CLAY_HEX);
-      v.entities.add({
-        name: parcelLabel ?? geometry.parcelNumber ?? "plot",
-        polygon: {
-          hierarchy: new Cesium.PolygonHierarchy(
-            Cesium.Cartesian3.fromDegreesArray(flatRing),
-          ),
-          height: 0,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          extrudedHeight: POLYGON_EXTRUDE_M,
-          extrudedHeightReference:
-            Cesium.HeightReference.RELATIVE_TO_GROUND,
-          material: clay.withAlpha(POLYGON_FILL_ALPHA),
-          outline: true,
-          outlineColor: clay,
-          outlineWidth: 3,
+      // Foundation pattern for the M3 layer control panel — future
+      // thematic overlays (MPZP, KIUT, slope) will register here and
+      // render through the same pipeline. The semantic slug
+      // (`plot-balice-773`) keeps share-URLs and panel UX free of raw
+      // cadastral ids.
+      const layerRegistry = new LayerRegistry();
+      layerRegistry.add({
+        id: plotLayerIdForTerytId(geometry.terytId),
+        name: parcelLabel ?? geometry.parcelNumber ?? "działka",
+        visible: true,
+        geometry: { kind: "polygon", boundary: geometry.boundary },
+        style: {
+          color: CLAY_HEX,
+          fillAlpha: POLYGON_FILL_ALPHA,
+          outlineWidthPx: 2,
+          drapeGlow: true,
+          glowPower: 0.12,
+        },
+        source: {
+          label: "ULDK GUGiK",
+          sourceId: geometry.terytId,
         },
       });
+
+      for (const layer of layerRegistry.getVisible()) {
+        const dispose = renderPolygonOverlay(layer, {
+          Cesium,
+          viewer: v,
+        });
+        overlayDisposers.push(dispose);
+      }
 
       // Camera positioning still needs an absolute ground baseline (the camera
       // is in WGS84 ECEF, not terrain-relative). Sample once to anchor the
@@ -316,6 +327,13 @@ export function Plot3DViewClient({
     return () => {
       disposed = true;
       if (flyTimer) clearTimeout(flyTimer);
+      // Explicit overlay teardown before viewer.destroy(): `destroy()`
+      // wipes the entity collection anyway, but running disposers first
+      // keeps renderer ownership symmetric (each render registers a
+      // disposer; each disposer runs) so future renderers that hold
+      // non-entity state (timers, listeners) clean up correctly.
+      for (const dispose of overlayDisposers) dispose();
+      overlayDisposers.length = 0;
       if (viewer) viewer.destroy();
     };
     // Geometry is plot-scoped; route navigation unmounts the viewer, so a
