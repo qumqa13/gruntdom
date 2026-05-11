@@ -1,9 +1,63 @@
 ﻿# Runbook: PZGiK NMT 1m Download
 
-**Status:** Spike complete - F1-T0 done
-**Branch:** feat/3d-viewer-data-layer
-**Last updated:** 2026-05-10
-**Author:** document-specialist agent
+**Status:** Spike complete - F1-T0 done · **corrected 2026-05-11** (see §0)
+**Branch:** feat/3d-viewer-data-layer (original); main (correction)
+**Last updated:** 2026-05-11
+**Authors:** document-specialist agent (F1-T0), Claude session 3 (ADR-0006 M2 correction)
+
+---
+
+## 0. Correction (2026-05-11): CRS confusion in original F1-T0 spike
+
+The F1-T0 spike below identified sheets `5.186.23.01/02/06/07` as covering Balice 773. **Those sheets are wrong** — they cover central-NW Poland (~15.24°E, 52.82°N, near Świnoujście/Szczecin axis). Detected during ADR-0006 M2 visual ack on 2026-05-11 via `gdalinfo -stats` on the post-bake mosaic GeoTIFF (height range 54-67 m, StdDev 2.5 m — coastal lowlands, not the Balice plateau which is 210-280 m).
+
+### Two compounding root causes
+
+1. **WFS BBOX axis-order trap.** The runbook §3.1 sent `BBOX=Xmin,Ymin,Xmax,Ymax,EPSG:2180` treating `(X=Easting, Y=Northing)` by geometric convention. The GUGiK WFS server (GeoServer) honours EPSG-spec axis order — for EPSG:2180 that is `(X=Northing, Y=Easting)`. So the runbook's BBOX for Balice (E≈557000, N≈247000 in PUWG-1992) actually queried the server at `(N=557000, E=247000)`, which is ≈ (52.6°N, 14.5°E) — NW Poland. The WFS dutifully returned NW-Poland sheets, and the runbook documented them as "Balice".
+2. **Wrong WFS service for modern data.** F1-T0 used the **KRON86** vertical-datum service (`NumerycznyModelTerenuKRON86/WFS/Skorowidze`), which only carries `SkorowidzNMT2000`..`SkorowidzNMT2019`. KRON86 happens to lack Strefa-7 (eastern Poland) coverage for the 2019 dataset, so even an axis-corrected query against KRON86 wouldn't find Balice. **The modern service is `NumerycznyModelTerenuEVRF2007/WFS/Skorowidze`**, which carries `SkorowidzNMT2018`..`SkorowidzNMT2025` and has full PL-2000:S7 coverage for Balice in 2023.
+
+Without GDAL on hand during F1-T0, the spike couldn't cross-check the resulting WGS84 geography — only sheet IDs and WFS-reported bboxes (whose own `srsName=EPSG:2180` axis-order interpretation matched the BBOX bug, so the numbers looked self-consistent). The discrepancy stayed hidden until M2 actually fed the data into Cesium.
+
+### Verified corrected sheets (2026-05-11)
+
+| Slot | Godło | Position | xllcenter (EPSG:2178) | yllcenter | SHA-256 (prefix) |
+|---|---|---|---|---|---|
+| sheet-01 | `7.126.10.11` | NW  | 7,412,000 | 5,552,000 | `70a9f9dd…` |
+| sheet-02 | `7.126.10.12` | N   | 7,413,600 | 5,552,000 | `d829d879…` |
+| sheet-03 | `7.126.10.16` | W   | 7,412,000 | 5,551,000 | `9b803455…` |
+| sheet-04 | `7.126.10.17` | **C** (★ plot-04 centroid) | 7,413,600 | 5,551,000 | `395db016…` |
+| sheet-05 | `7.126.10.21` | SW  | 7,412,001 | 5,550,000 | `6998d5e1…` |
+| sheet-06 | `7.126.10.22` | S   | 7,413,601 | 5,550,000 | `c62f9328…` |
+
+Full SHA-256s + URLs live in `public/nmt/balice-773.meta.json`.
+
+- **Service:** EVRF2007 (modern vertical datum, closer to WGS84 ellipsoidal heights than KRON86 — better behaviour under Cesium since absolute heights need less geoid correction).
+- **Year layer:** `SkorowidzNMT2023` (full PL-2000:S7 coverage for Balice; 2024 has only partial PL-1992 scheme-A reduplicates).
+- **Acquisition:** 2023-10-23, `nr_zglosz=77912`.
+- **CRS:** EPSG:2178 (PL-2000 Strefa 7, central meridian 21°E, false easting 7,500,000).
+- **Vertical datum:** EVRF2007 normal heights.
+- **Mosaic extent:** ~3 km × 3 km around Balice 773; includes Kraków-Balice airport runway head to the south-west (gives the depth-cue terrain drop the M2 visual ack needs).
+
+### Procedure guard for future plots (Phase A.5)
+
+Before fetching ANY plot's NMT sheets, mechanically derive its Strefa from WGS84 longitude:
+
+| Longitude range | Strefa | EPSG | WFS layer name prefix |
+|---|---|---|---|
+| 13.5°E – 16.5°E | S5 | 2176 | `5.X.Y.Z` |
+| 16.5°E – 19.5°E | S6 | 2177 | `6.X.Y.Z` |
+| 19.5°E – 22.5°E | S7 | 2178 | `7.X.Y.Z` |
+| 22.5°E – 25.5°E | S8 | 2179 | `8.X.Y.Z` |
+
+If the returned `uklad_xy` attribute or godło prefix doesn't match the predicted Strefa, **STOP and investigate** before downloading bytes. Then:
+
+1. **Use EVRF2007 service** (not KRON86) for any new ingestion. KRON86 is frozen at 2019.
+2. **Send BBOX in (N, E) axis order** when using `srsName=EPSG:2180`, or use `srsName=EPSG:4326` with `BBOX=lat_min,lng_min,lat_max,lng_max` if you prefer WGS84-native input (the server honours both, just consistently with EPSG spec axis order).
+3. **Verify post-download** with `head -6 sheet-*.asc` and check `xllcenter` matches the predicted Strefa's false-easting range (Strefa N → xllcenter ≈ `N5xx,xxx` where `N` is the zone digit). The build script (`scripts/build-terrain-tiles.mjs`) sanity-checks file size; cross-checking `xllcenter` should be added if Phase A.5 expands to multiple plots.
+
+### Original spike artefacts retained for reference
+
+§§1–11 below describe the *original* spike, including the wrong sheet selection. Treat the example URLs and sheet IDs in §3.2, §4.1, and §6.1 as illustrative-only — they cover NW Poland, not Balice. The actual ingest now lives in `scripts/build-terrain-tiles.mjs` against the sheets enumerated above.
 
 ---
 

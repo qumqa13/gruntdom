@@ -27,7 +27,7 @@ Builds the terrain tileset consumed by `Plot3DViewClient.tsx` (after M2-C3) via 
 1. `gdal_translate` — each `.asc` → `.tif`, assigning `EPSG:2176` (PL-2000:S5 — the sheet's horizontal CRS; ASC files don't embed CRS). **Cached** when all 4 GeoTIFFs already exist.
 2. `gdalbuildvrt` — combine the 4 GeoTIFFs into a single virtual raster. **Cached** when `mosaic.vrt` already exists.
 3. `gdalwarp` — reproject `EPSG:2176` → `EPSG:4326` (bilinear; required by ctb-tile). **Cached** when `mosaic-wgs84.tif` already exists.
-4. `ctb-tile -f Mesh -s 15 -e 1` — generate the quantized-mesh tile pyramid covering zoom levels 1..15. ctb-tile's flag convention is reversed vs. natural reading: `-s` is the *most-detailed* (highest-numbered) zoom and `-e` is the *least-detailed* (lowest); iteration runs highest → lowest. Always re-runs (the output dir is wiped first).
+4. `ctb-tile -f Mesh -s 15 -e 0` — generate the quantized-mesh tile pyramid covering zoom levels 0..15 inclusive. Level 0 is the world-root pair Cesium asks for first; omit it and the viewer renders an empty scene "in space". ctb-tile's flag convention is reversed vs. natural reading: `-s` is the *most-detailed* (highest-numbered) zoom and `-e` is the *least-detailed* (lowest); iteration runs highest → lowest. Always re-runs (the output dir is wiped first).
 5. `ctb-tile -l` — emit `layer.json`.
 6. Verify — `layer.json` present, `.terrain` file count ≥ 50.
 

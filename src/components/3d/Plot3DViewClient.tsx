@@ -205,6 +205,14 @@ export function Plot3DViewClient({
       // Net: slab follows the slope on both faces with a uniform 3 m thickness.
       // This replaces the milestone-2 single-uniform-height extrusion that
       // produced a levitating flat-bottomed box on Balice 773's N-S slope.
+      //
+      // `height: 0` is required alongside `heightReference: CLAMP_TO_GROUND`
+      // for Cesium to honour the height-reference enum on a polygon entity
+      // — without it Cesium logs "Entity ... with heightReference must also
+      // have a defined height. heightReference will be ignored" and the
+      // base falls back to ellipsoid altitude, manifesting as a floating
+      // "stamp" instead of a terrain-clamped slab. Surfaced during the M2
+      // C3 visual ack on Balice 773.
       const clay = Cesium.Color.fromCssColorString(CLAY_HEX);
       v.entities.add({
         name: parcelLabel ?? geometry.parcelNumber ?? "plot",
@@ -212,6 +220,7 @@ export function Plot3DViewClient({
           hierarchy: new Cesium.PolygonHierarchy(
             Cesium.Cartesian3.fromDegreesArray(flatRing),
           ),
+          height: 0,
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           extrudedHeight: POLYGON_EXTRUDE_M,
           extrudedHeightReference:
