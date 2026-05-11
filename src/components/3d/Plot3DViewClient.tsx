@@ -66,6 +66,22 @@ const PAPER_HEX = "#f4eedf";
 // sampled ground height by the same factor so the camera lands above the
 // exaggerated surface instead of being buried inside it.
 const VERTICAL_EXAGGERATION = 2.0;
+// ADR-0006 M2.5-E C2 — wheel-zoom inertia decay. Cesium's
+// `ScreenSpaceCameraController.inertiaZoom` is the per-frame fraction
+// retained from the previous zoom velocity (1.0 = no decay / infinite
+// glide, 0.0 = instant stop, default 0.8). Stakeholder feedback on the
+// M2.5-D visual-ack pass was "za duży ruch przybliżenia" — each wheel
+// notch jumped the camera too aggressively because the controller
+// applied the full step in 1-2 frames and then halted. Lifting the
+// retention to 0.93 spreads the same step across ~10× more frames
+// (geometric: 0.93^n decay), which the eye reads as a continuous
+// settle instead of a snap. The wheel passthrough invariant from
+// M2.5-D C1 is untouched — `enableInputs = false` pre-activation gates
+// the entire controller off, so wheel events still fall through to
+// page scroll until the user clicks the activation gate. Tuning knob:
+// if 0.93 still reads jumpy after visual ack, drop the per-notch zoom
+// factor (private `_zoomFactor`) by ~50% as a second-pass mitigation.
+const WHEEL_INERTIA_ZOOM = 0.93;
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -284,6 +300,12 @@ export function Plot3DViewClient({
       // by the time we reach this line, isActiveRef already reflects
       // the user's intent and Cesium boots armed.
       v.scene.screenSpaceCameraController.enableInputs = isActiveRef.current;
+      // M2.5-E C2 — wheel-zoom smoothing. Applied once at mount; the
+      // property is read by the controller every wheel event after
+      // activation, so the eased decay only kicks in when wheel events
+      // actually reach Cesium (i.e. post-activation). See
+      // WHEEL_INERTIA_ZOOM rationale for the value choice.
+      v.scene.screenSpaceCameraController.inertiaZoom = WHEEL_INERTIA_ZOOM;
 
       // M2.5-D C4 — loading-state machine. The paper skeleton overlay
       // stays in the tree until BOTH (a) at least 1500 ms have passed
