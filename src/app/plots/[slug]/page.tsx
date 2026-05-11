@@ -477,10 +477,20 @@ function ShowcaseThreeDView({
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
+          {/* Typographic status marker — BLACK CIRCLE (U+25CF) tinted
+              with the polygon's own clay (#b54a2c, the Plot3DViewClient
+              CLAY_HEX, deliberately a beat redder than the tailwind
+              `clay` token used elsewhere — matches what the WebGL
+              outline actually renders). Glyph-not-CSS-shape so the
+              caption stays inside the editorial typographic system
+              instead of stacking decorative geometry into a text row. */}
           <span
-            className="h-1.5 w-1.5 rounded-full bg-moss"
+            className="leading-none"
+            style={{ color: "#b54a2c" }}
             aria-hidden
-          />
+          >
+            ●
+          </span>
           Nakładka: Granice działki · ULDK GUGiK
           {geometry.terytId && (
             <span className="text-ink-faint"> · {geometry.terytId}</span>
