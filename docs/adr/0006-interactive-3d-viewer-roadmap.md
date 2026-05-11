@@ -1,7 +1,7 @@
 # ADR-0006 — Interactive 3D Plot Viewer: Roadmap & Long-term Strategy
 
 **Status:** Accepted
-**Version:** v2 (replaces v1 draft, 2026-05-11)
+**Version:** v3 (depth-first refocus, 2026-05-11 evening)
 **Date:** 2026-05-11
 **Supersedes:** Extends ADR-0002 §2 (Terrain Strategy), §2.1 (Imagery Strategy)
 **Related:** ADR-0002 (3D viewer + verified data layer), ADR-0004 (deferred Puppeteer screenshots), ADR-0005 (Path A — ION token in client bundle)
@@ -30,6 +30,35 @@ This ADR codifies Phase A (M0-M7) as the foundation infrastructure and Phase B (
 
 ---
 
+## Strategy Update — v3 (Depth-First on Balice 773)
+
+**Per stakeholder decision, 2026-05-11 evening:** the implementation strategy pivots from breadth-first (extend 3D viewer to all 4 plots, then deepen features) to **depth-first (perfect Balice 773 first, then mass-replicate to remaining 3 plots).**
+
+**Rationale:**
+- Balice 773 already has full ULDK verification and serves as the reference showcase plot
+- Once the full feature stack (Phase A M1-M7 + Phase B M8-M12) is polished on a single plot, scaling to other plots is mechanical work (each ~3-6h CC vs. 30-46h to build from scratch)
+- Eliminates risk of building 4 mediocre demos vs. 1 production-grade demo
+- B2B sales conversations need ONE plot that fully demonstrates the killer feature, not 4 that partially demonstrate it
+- Allows earlier user feedback from B2B prospects (target: 3 testimonials post-M12 on Balice 773)
+
+**Implementation reordering:**
+
+- **M0 original scope (verify all 4 plots, remove `threeDDemoStatus === "showcase"` gate)** → **deferred to Phase A.5 (post-M7)**
+- **M1-M7 + M8-M12 now operate on Balice 773 only**, with `threeDDemoStatus === "showcase"` gate retained
+- **Phase A.5 (new):** Mass-replicate verified Phase A + Phase B M8-M12 patterns to plots 1, 2, 3
+- **Phase B M13-M16 timing:** decided after Phase A.5 based on user testimonials and market signal
+
+**Definition of "Done" for depth-first Balice 773 (Level 2 target):**
+- Phase A M1-M7 complete on Balice 773 (current ortofoto/terrain/layers/sun/measurements)
+- Phase B M8-M12 complete on Balice 773 (MPZP parser pipeline limited to gmina Zabierzów + neighbors, MPZP envelope on plot 773, neighbor envelopes within 200m, future-shadow analysis, UI mode toggle visible)
+- Visual ack from stakeholder on each milestone
+- 3 testimonials from B2B prospects ("pośrednik, deweloper, inwestor") expressing payment intent
+- Architectural review confirming patterns are replicable to plots 1-3
+
+**Cumulative effort: ~50-70h CC + ~15-20h stakeholder review over 10-12 sessions (Phase A + Phase B M8-M12). Followed by ~10-18h CC for Phase A.5 (3 plots × 3-6h each).**
+
+---
+
 ## Decision
 
 We adopt a two-phase incremental roadmap:
@@ -44,14 +73,22 @@ Geoportal Polski is the authoritative source for all terrain, imagery, and thema
 
 ## Phase A — Foundation Infrastructure (M0-M7)
 
-### M0 — Preparation: extend 3D viewer to all 4 plots
+### M0 — Reference plot baseline (Balice 773 only, per v3 strategy)
 
-**Scope:** Remove `threeDDemoStatus === "showcase"` gate. Verify ULDK geometry for plot-01 (Zielonki), plot-02 (Podgórze), plot-03 (Mogilany) using the same Path B pattern as plot-04. Update `dataProvenance` for each.
+**Scope (v3 update):** Confirm Balice 773 is in a verified baseline state for depth-first development. Specifically:
 
-**Time:** 3–5h
-**Output:** All 4 plot detail pages render section 05 with verified polygons
-**Provenance added:** `ULDK GUGiK · {terytId}` for each plot
-**Gate:** Visual ack — all 4 plots show their own polygon in 3D, geometries match plot listing photos
+- ULDK geometry verified (already done in Path B, 2026-05-09 commit b7606bb)
+- `threeDDemoStatus === "showcase"` gate RETAINED for plot-04
+- Plots 1, 2, 3 remain at current state (synthetic/example) — verification deferred to **Phase A.5**
+- Sanity check: section 05 currently renders on Balice 773 via existing Plot3DViewClient (post merge 94784cb)
+- No code changes in M0 — this is a verification step before M1
+
+**Original M0 (verify all 4 plots) → moved to Phase A.5:** Post-M12 completion of Balice 773, mass-replicate verified Phase A + Phase B patterns to plots 01 (Zielonki), 02 (Podgórze), 03 (Mogilany). Each plot: ~3-6h CC for ULDK polygon verification + automated re-application of Phase A/B configuration. Phase A.5 cumulative estimate: 10-18h CC.
+
+**Time:** 0-1h (verification only)
+**Output:** Confirmation that Balice 773 is ready for M1 work
+**Provenance:** None new — existing ULDK GUGiK + dataProvenance from b7606bb
+**Gate:** Stakeholder confirms "Balice 773 section 05 renders correctly, polygon wbity w teren, ready for M1"
 
 ### M1 — Imagery swap: Bing Aerial → Geoportal ORTO StandardResolution
 
@@ -522,3 +559,4 @@ This ADR is considered fulfilled when **Phase A complete** AND **Phase B M8-M12 
 
 - **v1 (2026-05-11 morning):** Initial 7-milestone roadmap for "all 4 plots get 3D viewer"
 - **v2 (2026-05-11 evening):** Strategic refocus post-research. Added Phase B with MPZP envelope killer feature. B2B-first audience (agents, developers, investors, advanced buyers). Single product with three UI modes. Pricing 200-500 PLN/mc. Phase A scope unchanged structurally; M3 adds UI mode plumbing in preparation.
+- **v3 (2026-05-11 evening, post-v2):** Depth-first refocus. Implementation pivots from breadth-first (4 plots in M0) to depth-first (Balice 773 only through Phase A + Phase B M8-M12). Original M0 (verify all 4 plots) deferred to new Phase A.5 (post-M12). Rationale: 1 production-grade demo > 4 mediocre demos for B2B sales conversations. Target: 3 testimonials post-M12 before scaling. No changes to Phase A M1-M7 or Phase B M8-M16 scope; only ordering and M0 redefinition.
