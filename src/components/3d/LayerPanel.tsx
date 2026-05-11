@@ -16,10 +16,12 @@
  *     close button. Body groups layer rows into 3 editorial
  *     sections (Dane / Otoczenie / Analiza terenu, landing in C4).
  *
- * C1 scope (this commit): pure UI scaffolding. Rows are placeholders
- * — no click-to-toggle wiring yet; toggle glyphs (●/○) reflect the
- * registry's initial visibility but clicking a row does nothing.
- * C2 wires the toggle path through `LayerRegistry.setVisible`.
+ * Behavioural state (post-C2): row clicks call
+ * `registry.setVisible(layer.id, !layer.visible)`. The same
+ * `subscribe` channel that drives the count display also drives the
+ * row glyph re-render, so the write path and the read path share a
+ * single round-trip through the registry — no local React state
+ * mirrors the visibility flag at the row level.
  *
  * Editorial constraints (locked by milestone brief):
  *   - NO shadcn / Lucide / emoji / glassmorphism / gradients /
@@ -207,7 +209,13 @@ export function LayerPanel({ registry }: LayerPanelProps) {
                     splits the rows across the three sections. */}
                 {idx === 0 &&
                   layers.map((layer) => (
-                    <LayerRow key={layer.id} layer={layer} />
+                    <LayerRow
+                      key={layer.id}
+                      layer={layer}
+                      onToggle={() =>
+                        registry.setVisible(layer.id, !layer.visible)
+                      }
+                    />
                   ))}
               </section>
             ))}
@@ -219,26 +227,46 @@ export function LayerPanel({ registry }: LayerPanelProps) {
 }
 
 /**
- * Single layer row. C1 renders a static visibility glyph; click
- * handler arrives in C2. Glyph choices (●/○) match the editorial
- * dot-indicator language already used in the plakietka status
- * marker (line 500 of page.tsx) and the viewer's existing typographic
- * vocabulary — no new icon family introduced.
+ * Single layer row. Renders as a full-width `<button>` so the entire
+ * row is the click target — the visibility glyph is decorative, not
+ * an icon button on its own. `aria-pressed` carries the toggle
+ * semantic for assistive tech; `aria-label` composes the layer name
+ * with a Polish status hint ("widoczne" / "ukryte") so the
+ * announcement is self-explanatory without the visual glyph. Glyph
+ * choices (●/○) match the editorial dot-indicator language already
+ * used in the plakietka status marker at page.tsx line 500 and the
+ * viewer's existing typographic vocabulary — no new icon family
+ * introduced.
  */
-function LayerRow({ layer }: { layer: OverlayLayer }) {
+function LayerRow({
+  layer,
+  onToggle,
+}: {
+  layer: OverlayLayer;
+  onToggle: () => void;
+}) {
+  const stateHint = layer.visible ? "widoczne" : "ukryte";
   return (
-    <div
-      className="flex items-center justify-between py-1.5"
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center justify-between rounded-xs py-1.5 pl-1 pr-2 text-left transition-colors duration-150 hover:bg-paper-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clay/50"
+      aria-pressed={layer.visible}
+      aria-label={`${layer.name} — ${stateHint}, kliknij aby przełączyć`}
       data-testid={`layer-panel-row-${layer.id}`}
+      data-visible={layer.visible ? "true" : "false"}
     >
-      <span className="text-[13px] text-ink-body">{layer.name}</span>
       <span
-        className="font-mono text-[11px] text-clay"
+        className={`text-[13px] ${layer.visible ? "text-ink-body" : "text-ink-muted"}`}
+      >
+        {layer.name}
+      </span>
+      <span
+        className={`font-mono text-[11px] ${layer.visible ? "text-clay" : "text-ink-faint"}`}
         aria-hidden
-        data-visible={layer.visible ? "true" : "false"}
       >
         {layer.visible ? "●" : "○"}
       </span>
-    </div>
+    </button>
   );
 }
