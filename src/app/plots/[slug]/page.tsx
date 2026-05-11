@@ -482,7 +482,12 @@ function ShowcaseThreeDView({
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
         />
-        <span>Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m</span>
+        <span>
+          Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m
+          <span className="italic text-ink-faint">
+            {" · widok ×2 dla czytelności"}
+          </span>
+        </span>
         <span
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
