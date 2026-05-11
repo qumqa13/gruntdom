@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "validate:images": "node scripts/validate-plot-images.mjs",
+    "build-terrain": "node scripts/build-terrain-tiles.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
