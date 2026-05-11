@@ -148,7 +148,7 @@ Per ADR v3 depth-first scope, only Balice 773 has a baked tileset. Plots 01–03
 
 ### M2.5 — Polish + overlay foundation
 
-**✅ Completed 2026-05-11 on Balice 773** — two stakeholder-acked visual-ack gates (M2.5-A + M2.5-B). M2.5-D parked.
+**✅ Completed 2026-05-11 on Balice 773** — four stakeholder-acked visual-ack gates (M2.5-A + M2.5-B + M2.5-D + M2.5-E). M2.5-E ack closed the bundle 2026-05-11 evening after a chrome z-stack regression introduced by the M2.5-D focus-visible polish was caught and corrected.
 
 This bundle ships the visualisation refinements that came out of the M2 visual ack plus the overlay infrastructure that turns the parcel boundary into the first member of a future toggleable-layer family. Gated by a GRID0.5 probe (separate section below) that ruled out higher-resolution source data for Małopolska; M2.5 therefore lifts perceived relief via visualisation choices rather than finer NMT.
 
@@ -188,12 +188,58 @@ Caption row updated to read `Nakładka: Granice działki · ULDK GUGiK · {teryt
 
 Test suite grew from 113 to 136 offline tests across types (4), registry (11), polygon renderer (5), and plot-layer-id mapping (3).
 
-#### Parked for M2.5-D / M16 (carry-forward)
+#### M2.5-D — Viewer chrome + interaction polish
 
-- **M2.5-D fullscreen modal** — UX request from M2 C3 visual ack. Click-to-expand, Esc to close, Atelier-styled paper backdrop. Independent of terrain/overlay work; can land any session.
-- **Per-vertex normals + hillshade overlay** — richer relief readability under low-zoom orthography. Rides on the M2.5-B renderer infrastructure when it lands.
-- **Mobile fallback** — Cesium battery cost on phones; M16 toggles a "Map 2D" downgrade.
-- **`layer.json` `bounds` post-process** — still defaults to the eastern hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent. Efficiency hint only; content geometry is correct via `available[]`.
+**✅ Completed 2026-05-11 on Balice 773** — five commits land together because they share the same mount-lifecycle plumbing. The bundle closes four parked items from the M2 + M2.5-B carry-forward list (fullscreen modal, scroll passthrough, mobile path, recenter affordance) and adds focus-visible chrome polish on top.
+
+Five commits on `main` (chronological order):
+- `2997c5c` feat(3d): scroll passthrough + click-to-interact gate
+- `9683174` feat(3d): fullscreen modal toggle
+- `5509e83` feat(3d): mobile touch path + responsive viewer height
+- `60c0ec2` feat(3d): viewer chrome — reset button + loading state
+- `4423326` feat(3d): viewer chrome — focus-visible rings + explicit gate z-index
+
+**C1 — scroll passthrough + click-to-interact gate.** Viewer boots with `screenSpaceCameraController.enableInputs = false` so wheel events fall through to page scroll. A "Kliknij aby przesuwać" pill overlay activates the camera on click; Esc or a pointerdown outside the wrapper deactivates. The mount split into `wrapperRef` (React-managed siblings) + `cesiumMountRef` (Cesium-imperative descendants) keeps reconciliation away from Cesium's widget DOM. An `isActiveRef` mirror covers the race where a user clicks the overlay before the mount IIFE's first paint — the IIFE reads the ref to boot Cesium in the user's latest desired state. A `viewerHandleRef` exposing a minimal structural shape lets the activation-sync effect flip `enableInputs` without re-running the (expensive) mount IIFE.
+
+**C2 — fullscreen modal toggle.** Top-right expand/collapse chrome button flips the wrapper between `relative h-full w-full` (inline) and `fixed inset-0 z-[100]` (fullscreen). CSS-only, NOT a React Portal — a Portal would re-parent `Plot3DViewClient`, force the Cesium Viewer through unmount/remount, and lose the camera. The same instance stays mounted; Cesium's resize observer picks up the new canvas dimensions and the camera position survives the transition for free. Body scroll lock + Esc-to-close attach only while open and detach on teardown (previous `body.style.overflow` is snapshotted so we restore the page's setting rather than blanking it). The original C2 design placed the toggle at z-10 underneath the gate at z-[15], deliberately forcing an "activate first → chrome accessible" flow. **That wiring shipped broken (the toggle docblock claimed the layering, but the gate was z-auto until C5 closed the loop, and at C5 the regression activated).** Corrected in M2.5-E commit `bce5f35`; see §M2.5-E below for the root-cause analysis.
+
+**C3 — mobile touch path + responsive viewer height.** A `(pointer: coarse)` matchMedia gates a larger 64 px tap target for touch activation, swapping the desktop "Kliknij aby przesuwać" pill for a touch-friendly "Dotknij, aby aktywować" affordance. `touch-action: pan-y` on the wrapper lets a one-finger vertical swipe scroll the page in not-armed state; when armed the canvas mount swaps to `touch-none` so Cesium consumes pan / pinch / two-finger rotate without the browser also trying to scroll. Viewer height becomes responsive across breakpoints rather than the M2-era fixed crop.
+
+**C4 — recenter button + loading state machine.** Bottom-left recenter button rebinds the initial flyTo via a closure-bound thunk wired up inside the mount IIFE after the M2 fly-to setTimeout resolves; click recalls heading + pitch + zoom + framing without re-running the expensive mount. Reset uses `EasingFunction.QUADRATIC_OUT` (softer settling) versus the initial flight's `QUARTIC_OUT` (snappier arrival). Visible regardless of activation state — re-framing doesn't require first arming the camera controller, which keeps the affordance discoverable on cold load. Loading overlay (paper backdrop, 1 px clay border, animate-pulse, italic JetBrains Mono "Wczytywanie terenu…" caption) covers the viewer until BOTH (a) ≥ 1500 ms have passed AND (b) `scene.globe.tilesLoaded === true` OR ≥ 30 rendered frames have run. 1500 ms is the floor that prevents flicker on fast local-cache paths; the frame-count fallback covers the dynamic-tile streaming case where `tilesLoaded` never settles true. Implemented via `scene.postRender.addEventListener` so we burn no frames on polling — the handler only runs when Cesium is already rendering. Overlay sits at z-[20] above the click-to-interact gate so the user can't accidentally arm the camera mid-load.
+
+**C5 — focus-visible rings + explicit gate z-index.** Suppressed the default browser outline on both chrome buttons + painted a clay `focus-visible:ring-2` ring matching the rest of the Atelier system. Promoted the activation gate to explicit `z-[15]` to align the className with the C2 docblock claim that "the toggle sits underneath the C1 click-to-interact overlay at z-[15]". This z-promotion inadvertently inverted the chrome stack and broke the fullscreen toggle — the regression and fix live in §M2.5-E below.
+
+#### M2.5-E — Chrome z-stack regression fix + wheel-zoom smoothing
+
+**✅ Completed 2026-05-11 evening on Balice 773** — visual ack passed after M2.5-D close. Two commits on `main`:
+
+- `bce5f35` fix(3d): chrome above activation gate — fullscreen modal now opens
+- `4d6c637` feat(3d): wheel-zoom smoothing — inertiaZoom 0.8 → 0.93
+
+**C1 — chrome z-stack regression fix.** Stakeholder report after M2.5-D ack: corner expand button "kliknął i nic się nie stało". Root cause was a CSS-stacking regression introduced by commit `4423326` (M2.5-D C5). Both wrappers (`Plot3DView` outer, `Plot3DViewClient` inner) are `relative` without z-index, so neither establishes a stacking context. All positioned descendants flatten into the nearest ancestor context, where the gate's freshly-explicit z-[15] beat the FullscreenToggle's z-10. The gate's `absolute inset-0` then painted AND hit-tested on top of the corner button. Click on the visual corner location fired the gate's `onClick={() => setIsActive(true)}`, gate unmounted, viewer armed silently — no fullscreen toggle ever fired. Pre-4423326 the gate was z-auto and lost to the toggle's explicit z-10 in CSS level-7 painting; M2.5-D C5 closed the docblock loop and quietly inverted the layering at the same time.
+
+Fix is a 2-line z-bump (commit `bce5f35`): `FullscreenToggleButton` inline `positionClass` and the bottom-left recenter button both lifted from `z-10` to `z-[16]`. Loading overlay stays at `z-[20]` so chrome remains inert during terrain streaming (invariant preserved). Fullscreen-mode toggle stays at `z-[110]` (already correct, unchanged). Body-click activation still works — the gate hit-tests over the entire cesium surface minus the two 40 × 40 chrome corner squares.
+
+Design-intent inversion captured in the `FullscreenToggleButton` docblock: M2.5-D C2's original design forced an "activate first → chrome accessible" flow by deliberately stacking the gate above the toggle. Stakeholder rejected that — chrome is navigation, not interaction; it should be a single-click affordance regardless of camera-arm state. The new policy: gate covers the viewer body, yields to the two corner chrome squares.
+
+**C2 — wheel-zoom smoothing.** Stakeholder feedback on the M2.5-D ack: "za duży ruch przybliżenia". Cesium's `ScreenSpaceCameraController` was applying each wheel notch in 1-2 frames and halting, reading as a snap rather than a glide. `inertiaZoom` is the per-frame retention fraction of the previous zoom velocity (1.0 = no decay / infinite glide, 0.0 = instant stop, default 0.8). Lifting it to 0.93 spreads the same total displacement across ~10× more frames (geometric 0.93^n decay) — same magnitude, smoother arrival. The wheel-passthrough invariant from M2.5-D C1 is preserved untouched: `enableInputs = false` pre-activation gates the entire controller off, so wheel events still fall through to page scroll until the user clicks the activation gate. The inertia property is set once at mount and has no effect while wheel events bypass Cesium.
+
+Tuning headroom captured for a future iteration: if a later visual ack reads "still jumpy" once stakeholders spend more time in armed state, the second-pass mitigation drops the per-notch zoom factor by ~50% (private `_zoomFactor` or a custom wheel listener). Not needed at the M2.5-E ack — `inertiaZoom 0.93` cleared the bar in one pass.
+
+Test suite at M2.5-E close: 137/137 (one new vitest path resolved under the activation/loading state machine; tsc + lint clean).
+
+#### Parked for M2.6 / M2.7 / M3 / M16 (carry-forward post-M2.5-E)
+
+- **M2.6 terrain depth pass** — stakeholder feedback after M2.5-E ack: "płaska tekstura, brak zróżnicowania terenu". Even with ×2 exaggeration the Balice mosaic reads cartographically thin because the GRID1 1 m source data has no shading cues — flat orthorectified imagery draped on a relatively smooth mesh. M2.6 pivots back to the original cartographic-polish path with three layered mitigations:
+  - **Per-vertex normals** — pass `requestVertexNormals: true` to `CesiumTerrainProvider.fromUrl`, enabling Cesium's built-in lambert shading. Requires re-bake — ctb-tile must emit normals into the quantized-mesh tiles; the existing `npm run build-terrain` cache short-circuits steps 1-3 but step 4 (ctb-tile) re-runs with the new flag.
+  - **Hillshade overlay** — semi-transparent GUGiK or computed hillshade layer above ortofoto. WMS source TBD; if Geoportal doesn't publish a usable hillshade, derive locally from the same NMT GRID1 data at bake time and serve from R2 alongside the terrain tileset.
+  - **Sun lighting** — `scene.globe.enableLighting = true` with a stable noon-position sun. Atmosphere and dynamic time-of-day stay deferred to Phase A M6 (sun position & shadows) — M2.6 wants the readability mitigation, not the analysis primitive.
+  - Supersedes the M2.5-B "per-vertex normals + hillshade overlay" parked item — that line item gets the formal M2.6 scope here.
+  - **Time:** 4-6 h (re-bake required for vertex normals; hillshade source investigation gates the start).
+- **M2.7 contextual layers** — first move toward thematic overlay UX before the full M3 panel. Likely scope: a single MPZP-or-equivalent toggle wired through the LayerRegistry to validate the disposer-symmetric renderer contract under a non-cadastral data source. Defines whether the renderer abstraction generalises before M3 builds UI on top of it. Detailed scope decided at M2.6 ack.
+- **M3 layer control panel UI** — still parked; queues after M2.6 + M2.7. Foundation already shipped in M2.5-B (`LayerRegistry` + `OverlayLayer` types + polygon renderer + `subscribe` channel).
+- **Mobile fallback to 2D** — Cesium battery cost on phones; M16 toggles a "Map 2D" downgrade. Still parked.
+- **`layer.json` `bounds` post-process** — still defaults to the eastern-hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent. Efficiency hint only; content geometry is correct via `available[]`. Still parked under M16.
 
 ### NMT GRID0.5 probe finding (2026-05-11)
 
