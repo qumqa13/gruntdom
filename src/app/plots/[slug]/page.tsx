@@ -487,11 +487,10 @@ function ShowcaseThreeDView({
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
         />
-        <span>Mapa · Bing Maps Aerial (ION asset 2)</span>
+        <span>Ortofoto · Geoportal ORTO · StandardResolution · PZGiK</span>
       </div>
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-        Pełnoekranowy obraz dla pełnej czytelności · ortofoto Geoportal
-        zaplanowane w F2-T5
+        Pełnoekranowy obraz dla pełnej czytelności · 25-50 cm/piksel
       </p>
     </div>
   );

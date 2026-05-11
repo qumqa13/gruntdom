@@ -272,6 +272,29 @@ function bucketFor(layer: WmsLayer): TokenBucket {
   return b;
 }
 
+/**
+ * Public registry accessor — exposes the upstream host + LAYERS tag for a
+ * given layer enum. Used by route handlers that proxy WMS requests with
+ * caller-supplied CRS/BBOX (e.g. Cesium's WebMapServiceImageryProvider streaming
+ * in EPSG:4326) instead of the fetchWmsTile path locked to EPSG:2180.
+ */
+export function getWmsLayerRegistry(layer: WmsLayer): {
+  host: string;
+  layers: string;
+} {
+  return LAYER_REGISTRY[layer];
+}
+
+/**
+ * Public rate-limit gate — same token bucket used by fetchWmsTile.
+ * Awaiting this resolves as soon as the per-layer budget allows another
+ * upstream call (default 1/30 s, ORTO_STANDARD 1/2 s).
+ */
+export async function acquireWmsBudget(layer: WmsLayer): Promise<void> {
+  await bucketFor(layer).acquire();
+  recordRequest();
+}
+
 interface CacheMeta {
   layer: WmsLayer;
   bbox: BBox2180;

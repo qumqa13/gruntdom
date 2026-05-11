@@ -1,19 +1,18 @@
 "use client";
 
 /**
- * F2-T1 spike — Cesium client mount.
+ * F2-T1 spike + ADR-0006 M1 — Cesium client mount.
  *
- * Milestone 1 (✅): empty viewer mounts via dynamic({ ssr:false }).
- * Milestone 2 (this): Cesium ION World Terrain (Tier 2 per ADR-0002 §6.3) +
- *   plot-04 ULDK polygon extruded ~3 m above sampled ground heights.
+ * Imagery: Geoportal ORTO StandardResolution via /api/geoportal/wms proxy
+ *   (25-50 cm/px Polish ortofoto). Pre-flight probe with 3 s timeout; if
+ *   the proxy or upstream Geoportal is unhealthy, fall back to Bing Maps
+ *   Aerial (ION asset 2, ~1 m/px in Poland).
+ * Terrain: Cesium ION World Terrain (Tier 2 per ADR-0002 §6.3), with
+ *   ellipsoid fallback when the ION token is missing.
  *
  * Token routing: Path A (NEXT_PUBLIC_CESIUM_ION_TOKEN, ION-direct) per
  * ADR-0005. Free-tier domain-restricted JWT is browser-bearer by design;
  * the dashboard pins it to specific origins before public deploy.
- *
- * Graceful degradation: when the env var is missing (CI / preview without
- * secret) the viewer falls back to EllipsoidTerrainProvider with the polygon
- * pinned at h=0. No throw, just a console.warn — keeps the build green.
  */
 
 import { useEffect, useRef } from "react";
@@ -40,12 +39,38 @@ const ION_TOKEN = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN ?? "";
 const CLAY_HEX = "#b54a2c";
 const PAPER_HEX = "#f4eedf";
 const POLYGON_EXTRUDE_M = 3;
+const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
+const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
+const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
+// Tiny probe centred over Poland — used to verify the proxy + upstream are
+// alive within the timeout budget before we commit Cesium to streaming
+// from Geoportal vs. failing back to Bing.
+const GEOPORTAL_PROBE_BBOX = "50.07,19.7,50.0701,19.7001";
 // Tuned 0.18 → 0.15 after first visual pass: clay@18% over Bing aerial
 // (green over Balice) read too dark; 15% keeps the polygon legible without
 // muddying the imagery. Aesthetic-bucket call, see F2-T1 spike result doc.
 const POLYGON_FILL_ALPHA = 0.15;
 const CAMERA_FLY_DELAY_MS = 800;
 const CAMERA_FLY_DURATION_S = 1.5;
+
+async function probeGeoportalOrto(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    GEOPORTAL_PROBE_TIMEOUT_MS,
+  );
+  try {
+    const probeUrl = `${GEOPORTAL_WMS_PROXY}?layer=${GEOPORTAL_ORTO_LAYER}&service=WMS&request=GetMap&version=1.3.0&crs=EPSG:4326&bbox=${GEOPORTAL_PROBE_BBOX}&width=1&height=1&format=image/jpeg&layers=Raster&styles=`;
+    const res = await fetch(probeUrl, { signal: controller.signal });
+    if (!res.ok) return false;
+    const ct = res.headers.get("content-type") ?? "";
+    return ct.startsWith("image/");
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function Plot3DViewClient({
   geometry,
@@ -93,9 +118,37 @@ export function Plot3DViewClient({
       }
       if (disposed || !containerRef.current) return;
 
+      // Imagery selection: Geoportal ORTO StandardResolution if reachable
+      // within the probe budget; otherwise fall back to Cesium ION default
+      // (Bing Maps Aerial, asset 2) when a token is present, else no imagery.
+      // TODO(F2-T5 cleanup): remove the Bing fallback path after 30 days of
+      // production stability on Geoportal ORTO (target removal ~mid-Jun 2026).
+      const geoportalReady = await probeGeoportalOrto();
+      if (disposed) return;
+      let baseLayer: InstanceType<typeof Cesium.ImageryLayer> | false | undefined;
+      if (geoportalReady) {
+        const ortoProvider = new Cesium.WebMapServiceImageryProvider({
+          url: `${GEOPORTAL_WMS_PROXY}?layer=${GEOPORTAL_ORTO_LAYER}`,
+          layers: "Raster",
+          parameters: {
+            transparent: false,
+            format: "image/jpeg",
+          },
+          tilingScheme: new Cesium.GeographicTilingScheme(),
+        });
+        baseLayer = new Cesium.ImageryLayer(ortoProvider, {});
+      } else if (hasToken) {
+        console.warn(
+          "[Plot3DView] Geoportal ORTO probe failed (>3s or unhealthy) — falling back to Bing Maps Aerial (ION asset 2)",
+        );
+        baseLayer = undefined;
+      } else {
+        baseLayer = false;
+      }
+
       const v = new Cesium.Viewer(containerRef.current, {
         terrainProvider,
-        baseLayer: hasToken ? undefined : false,
+        baseLayer,
         baseLayerPicker: false,
         geocoder: false,
         homeButton: false,
