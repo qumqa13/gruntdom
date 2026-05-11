@@ -779,7 +779,16 @@ export function Plot3DViewClient({
         geometry: {
           kind: "domOverlay",
           lines: [
-            `Balice DZIAŁKA ${labelParcel}`,
+            // `parcelLabel` already arrives as `DZIAŁKA <n>` from
+            // page.tsx (line 458–460) when parcelNumber is present.
+            // Sub-task B briefly hard-coded a second "DZIAŁKA " into
+            // the template here, producing "Balice DZIAŁKA DZIAŁKA
+            // 773" — caught on visual ack. The fix is to rely on
+            // `parcelLabel`'s own prefix, same shape the M2.7 C5
+            // LabelGraphics variant used. Fallback values
+            // (parcelNumber / terytId / "działka") read more
+            // gracefully without an extra literal too.
+            `Balice ${labelParcel}`,
             "711 m²",
             "Maks. zabudowa 213 m² · wys. 9 m",
           ],
