@@ -235,6 +235,11 @@ export function Plot3DViewClient({
   // toggles the 300 ms opacity fade just before unmount.
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFading, setIsLoadingFading] = useState(false);
+  // M2.7 C6 — visible-overlay count derived from the LayerRegistry's
+  // subscribe channel. Hardcoded "1 nakładka aktywna" in page.tsx
+  // (M2.5-B) is gone — the indicator now reflects the actual registry
+  // state so M3's toggle UX flips this label without extra plumbing.
+  const [visibleOverlayCount, setVisibleOverlayCount] = useState(0);
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -488,6 +493,19 @@ export function Plot3DViewClient({
       // (`plot-balice-773`) keeps share-URLs and panel UX free of raw
       // cadastral ids.
       const layerRegistry = new LayerRegistry();
+      // M2.7 C6 — bind the React indicator state to the registry's
+      // subscribe channel BEFORE the initial `add()` calls so the four
+      // M2.5-B + M2.7 registrations seed the count via the same code
+      // path future M3 panel toggles will use. setState is batched, so
+      // four notifications collapse into a single re-render.
+      const unsubscribeFromRegistry = layerRegistry.subscribe(() => {
+        if (disposed) return;
+        setVisibleOverlayCount(layerRegistry.getVisible().length);
+      });
+      // Cleanup hook stored alongside the other disposers; runs in the
+      // effect teardown below.
+      overlayDisposers.push(unsubscribeFromRegistry);
+
       layerRegistry.add({
         id: plotLayerIdForTerytId(geometry.terytId),
         name: parcelLabel ?? geometry.parcelNumber ?? "działka",
@@ -800,6 +818,21 @@ export function Plot3DViewClient({
           </div>
         </div>
       )}
+      {/* M2.7 C6 — registry-bound layer count indicator. Replaces the
+          M2.5-B hardcoded "1 nakładka aktywna" span that lived in
+          page.tsx; the count now derives from LayerRegistry.subscribe
+          (4 active by default after M2.7: polygon + buildings + streets
+          + plot info label). Pointer-events-none so the pill never
+          intercepts Cesium drag input. Positioned top-LEFT to avoid
+          colliding with the fullscreen toggle at top-right. */}
+      {visibleOverlayCount > 0 && (
+        <span
+          className="pointer-events-none absolute left-3 top-3 z-10 rounded-xs border border-line/40 bg-paper/85 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint"
+          data-testid="plot3d-overlay-count"
+        >
+          {visibleOverlayCount} {pluralizeNakladka(visibleOverlayCount)}
+        </span>
+      )}
       {/* M2.5-D C4 — recenter button bottom-left. Re-runs the initial
           flyTo via the closure-bound thunk in resetCameraRef. Visible
           regardless of activation state so the user can re-frame the
@@ -847,6 +880,29 @@ export function Plot3DViewClient({
       )}
     </div>
   );
+}
+
+/**
+ * M2.7 C6 — Polish pluralization for the layer-count indicator.
+ *
+ * Polish noun plurals split into three forms based on the count:
+ *   - 1 → singular ("1 nakładka aktywna")
+ *   - 2-4, 22-24, 32-34, … → "few" form ("2 nakładki aktywne"), with
+ *     the carve-out that 12/13/14 use the "many" form
+ *   - everything else (0, 5+, teens 11-19, etc.) → "many" form
+ *     ("5 nakładek aktywnych")
+ *
+ * The carve-out for 12-14 is the standard rule — same logic Polish
+ * grammar APIs (Intl.PluralRules pl-PL) apply.
+ */
+function pluralizeNakladka(n: number): string {
+  if (n === 1) return "nakładka aktywna";
+  const lastDigit = n % 10;
+  const lastTwo = n % 100;
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+    return "nakładki aktywne";
+  }
+  return "nakładek aktywnych";
 }
 
 /**
