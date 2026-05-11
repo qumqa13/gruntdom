@@ -107,6 +107,37 @@ const WHEEL_INERTIA_ZOOM = 0.93;
 // the cost of urban context, looser values risk the seam
 // returning.
 const MAX_ZOOM_DISTANCE_M = 5000;
+// ADR-0006 M2.9 C2 — plot-centered pan soft-constraint. Companion
+// to the M2.9 C1 zoom-out cap: even with zoom bounded, the user
+// can still drag the camera laterally far enough to lose the plot
+// from the frame, which defeats the depth-first showcase posture
+// where Balice 773 is the page's foreground subject. Rather than
+// hard-clamp lateral pan (Cesium has no native lateral
+// `maximumPanDistance` knob — `constrainedAxis` is for tilt, not
+// translation), we register a `camera.moveEnd` listener and
+// rubber-band the camera back toward the plot when its
+// ground-projected position drifts more than MAX_PAN_DISTANCE_M
+// from the plot centroid. The pullback target is on the boundary
+// circle (not the centroid itself) so the constraint reads as a
+// soft tether — the camera lands at the rim of the allowed
+// radius, in the same compass direction the user was panning,
+// not snap-recentered. Same paper-map intuition as a planimeter:
+// you can move freely inside the disc; cross the rim and the
+// view eases back to the rim. The on-stop listener choice (vs.
+// per-frame distance check) avoids fighting the M2.5-E C2 wheel
+// inertia — per-frame pullback would create a constant tug that
+// reads as jitter; on-stop fires once after the user releases,
+// so the rubber-band motion is a clean single arc.
+//
+// Tuning knobs:
+//   - MAX_PAN_DISTANCE_M 2000-5000 m — tighter privileges plot
+//     framing, looser allows more urban context exploration
+//   - PAN_PULLBACK_DURATION_S 0.5-1.5 s — faster reads as snap,
+//     slower as drift; 0.8 s matches the reset thunk's
+//     QUADRATIC_OUT settle character (M2.5-D C4) so the two
+//     automated camera motions feel related
+const MAX_PAN_DISTANCE_M = 3000;
+const PAN_PULLBACK_DURATION_S = 0.8;
 // ADR-0006 M2.6 C1 — globe lighting fade distances. Cesium's
 // `Globe.enableLighting` is gated by a distance-based fade so the
 // orbital-globe use case (lighting kicks in when you're far enough
@@ -754,6 +785,72 @@ export function Plot3DViewClient({
         orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
       });
 
+      // M2.9 C2 — plot-centered pan soft-constraint. `isAutoFlying`
+      // starts true and flips to false on the initial flyTo `complete`
+      // below; the moveEnd handler short-circuits while true so the
+      // initial setView + flyTo don't trigger their own pullback. We
+      // also re-arm it during the rubber-band flyTo itself to prevent
+      // a self-feedback loop. The handler reads camera state at the
+      // moment the user's input settles, computes a ground-projected
+      // distance from the plot centroid, and pulls the camera back to
+      // the soft-constraint rim (not the centroid) so the motion
+      // reads as a tether release rather than a recenter. See
+      // MAX_PAN_DISTANCE_M rationale.
+      let isAutoFlying = true;
+      const handleMoveEnd = () => {
+        if (isAutoFlying || disposed) return;
+        const cameraCarto = Cesium.Cartographic.fromCartesian(v.camera.position);
+        const cameraLngDeg = Cesium.Math.toDegrees(cameraCarto.longitude);
+        const cameraLatDeg = Cesium.Math.toDegrees(cameraCarto.latitude);
+        // Ground-projected distance: project both points to ellipsoid
+        // height 0 before measuring, so high-altitude orbits don't
+        // inflate the lateral distance with camera altitude.
+        const cameraGround = Cesium.Cartesian3.fromDegrees(
+          cameraLngDeg,
+          cameraLatDeg,
+        );
+        const plotGround = Cesium.Cartesian3.fromDegrees(cLng, cLat);
+        const groundDistance = Cesium.Cartesian3.distance(
+          cameraGround,
+          plotGround,
+        );
+        if (groundDistance <= MAX_PAN_DISTANCE_M) return;
+        // Pull back to the rim, not the centroid: scale the camera's
+        // lateral offset by MAX_PAN_DISTANCE_M / groundDistance so the
+        // target lands on the soft-constraint boundary circle, in the
+        // same azimuth the user was panning. Soft-tether read.
+        const pullFactor = MAX_PAN_DISTANCE_M / groundDistance;
+        const targetLng = cLng + (cameraLngDeg - cLng) * pullFactor;
+        const targetLat = cLat + (cameraLatDeg - cLat) * pullFactor;
+        const currentHeading = v.camera.heading;
+        const currentPitch = v.camera.pitch;
+        const currentRoll = v.camera.roll;
+        isAutoFlying = true;
+        v.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            targetLng,
+            targetLat,
+            cameraCarto.height,
+          ),
+          orientation: {
+            heading: currentHeading,
+            pitch: currentPitch,
+            roll: currentRoll,
+          },
+          duration: PAN_PULLBACK_DURATION_S,
+          easingFunction: Cesium.EasingFunction.QUADRATIC_OUT,
+          complete: () => {
+            isAutoFlying = false;
+          },
+          cancel: () => {
+            isAutoFlying = false;
+          },
+        });
+      };
+      const removeMoveEndListener =
+        v.camera.moveEnd.addEventListener(handleMoveEnd);
+      overlayDisposers.push(removeMoveEndListener);
+
       flyTimer = setTimeout(() => {
         if (disposed || !viewer) return;
         const flyAlt =
@@ -774,6 +871,13 @@ export function Plot3DViewClient({
           },
           duration: CAMERA_FLY_DURATION_S,
           easingFunction: Cesium.EasingFunction.QUARTIC_OUT,
+          // M2.9 C2 — arm the pan soft-constraint once the initial
+          // flyby has settled. Until this fires, the moveEnd handler
+          // short-circuits via the `isAutoFlying` flag so the initial
+          // approach doesn't trigger its own pullback.
+          complete: () => {
+            isAutoFlying = false;
+          },
         });
 
         // M2.5-D C4 — bind the reset thunk now that we have the
