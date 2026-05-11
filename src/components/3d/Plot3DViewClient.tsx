@@ -130,6 +130,25 @@ const CARTODB_STREETS_URL =
 const CARTODB_STREETS_SUBDOMAINS = ["a", "b", "c", "d"];
 const CARTODB_STREETS_MAX_LEVEL = 19;
 const CARTODB_STREETS_OPACITY = 0.55;
+// ADR-0006 M2.8 C3 — contour-line overlay derived from the NMT
+// GRID1 1 m mosaic (the same bake M2 produces and M2.6 self-heals
+// with octvertexnormals). Pre-baked PNG pyramid; the tile pipeline
+// lives in `scripts/build-contour-tiles.mjs` and the bake step is
+// `npm run build-terrain:contour`. Output path is
+// `/terrain-tiles/contour/balice/{z}/{x}/{y}.png` served by Next's
+// static handler. Cesium's UrlTemplateImageryProvider 404s outside
+// the bake's ~100 m plot-vicinity bbox — that 404-as-transparent
+// behaviour IS the bbox-restriction mechanism (no runtime clipping
+// needed in the renderer).
+//
+// Opacity 0.75 makes the clay hairlines crisp without losing the
+// imagery underneath. Below ~0.55 the lines wash out; above ~0.90
+// they start to dominate. Tuning knob if visual ack reads
+// off-balance.
+const CONTOUR_TILES_URL =
+  "/terrain-tiles/contour/balice/{z}/{x}/{y}.png";
+const CONTOUR_TILES_MAX_LEVEL = 19;
+const CONTOUR_OPACITY = 0.75;
 // ADR-0006 M2.7 C5 — plot info label visibility threshold. Hidden
 // past 2 km because the multi-line pill becomes illegible noise at
 // Małopolska-scale framing; visible inside that band where the
@@ -510,6 +529,30 @@ export function Plot3DViewClient({
         source: {
           label: "ULDK GUGiK",
           sourceId: geometry.terytId,
+        },
+      });
+
+      // M2.8 C3 — contour-line overlay (poziomice) over plot vicinity.
+      // Pre-baked PNG pyramid from `npm run build-terrain:contour`.
+      // Registered BEFORE streets so the imagery stack reads, bottom-
+      // up: ORTO → contour hairlines → streets navigable foreground.
+      // The polygon outline (Cesium entity, drawn after all imagery)
+      // and the plot info label (also an entity) stay on top.
+      // Source label distinguishes the derived bake from the source
+      // NMT GRID1 already credited under the terrain plakietka row.
+      layerRegistry.add({
+        id: "contour-balice-773",
+        name: "Poziomice",
+        visible: true,
+        geometry: {
+          kind: "raster",
+          urlTemplate: CONTOUR_TILES_URL,
+          maximumLevel: CONTOUR_TILES_MAX_LEVEL,
+        },
+        style: { color: CLAY_HEX, opacity: CONTOUR_OPACITY },
+        source: {
+          label: "derived NMT GRID1 · gdal_contour",
+          sourceId: "1 m interval + 5 m index",
         },
       });
 
