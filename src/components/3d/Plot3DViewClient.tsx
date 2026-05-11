@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
+import { createOverlayReconciler } from "@/lib/overlays/overlayReconciler";
 import { plotLayerIdForTerytId } from "@/lib/overlays/plotLayerId";
 import { renderOverlay } from "@/lib/overlays/renderOverlay";
 import type { OverlayDisposer } from "@/lib/overlays/types";
@@ -640,6 +641,32 @@ export function Plot3DViewClient({
       // are done.
       const layerRegistry = new LayerRegistry();
 
+      // M3 C2 fix — registry-to-scene visibility reconciler. The
+      // M2.7→M2.9 dispatcher was a one-shot pass over
+      // `getVisible()` at viewer init: renderers ran exactly once
+      // and disposers batched for teardown. That posture assumed
+      // visibility never changed at runtime, which broke when
+      // LayerPanel started flipping `setVisible` without a scene-
+      // side reaction. The reconciler subscribes to the same
+      // notify() channel the panel uses and diffs the layer list
+      // against a live disposer Map on every mutation — toggle off
+      // calls the layer's disposer; toggle on re-renders it. Single
+      // source of truth across UI + scene.
+      //
+      // Subscribe BEFORE the add() calls so each registry.add()
+      // fires the reconciler incrementally — each newly-added
+      // visible layer is rendered exactly once over the init pass,
+      // matching the cost of the old one-shot loop.
+      const overlayReconciler = createOverlayReconciler({
+        renderLayer: (layer) => renderOverlay(layer, { Cesium, viewer: v }),
+      });
+      const unsubscribeReconciler = layerRegistry.subscribe(() => {
+        if (disposed) return;
+        overlayReconciler.reconcile(layerRegistry.getAll());
+      });
+      overlayDisposers.push(unsubscribeReconciler);
+      overlayDisposers.push(() => overlayReconciler.disposeAll());
+
       layerRegistry.add({
         id: plotLayerIdForTerytId(geometry.terytId),
         name: parcelLabel ?? geometry.parcelNumber ?? "działka",
@@ -810,18 +837,15 @@ export function Plot3DViewClient({
         },
       });
 
-      // M2.7 — dispatch by `layer.geometry.kind` rather than calling
-      // `renderPolygonOverlay` directly. The dispatcher handles polygon
-      // (M2.5-B), raster (M2.7 streets + parked-hillshade), label
-      // (M2.7 plot info), and tileset (foundation preserved — buildings
-      // consumer rolled back in M2.7 C8; renderer + types union + tests
-      // stay live, ready for a future replacement). Future renderer
-      // additions plug into the dispatcher rather than here; this loop
-      // stays unchanged as the registry grows.
-      for (const layer of layerRegistry.getVisible()) {
-        const dispose = renderOverlay(layer, { Cesium, viewer: v });
-        overlayDisposers.push(dispose);
-      }
+      // M2.7 → M3 C2 fix — the one-shot `for (const layer of
+      // layerRegistry.getVisible()) renderOverlay(...)` dispatcher
+      // loop is gone. The reconciler subscription set up just above
+      // already rendered each visible layer exactly once as the
+      // add() calls above ran (notify-per-add → reconcile-per-notify
+      // → renderLayer for any newly-visible layer not already in
+      // the disposer Map). Toggle off / toggle on now flows through
+      // the same path, which is what makes the M3 panel actually
+      // affect the scene.
 
       // M3 C1 — publish the registry instance to component state so
       // LayerPanel can subscribe to it. Done AFTER the initial `add()`
