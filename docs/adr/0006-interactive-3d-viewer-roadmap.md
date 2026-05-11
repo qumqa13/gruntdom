@@ -434,6 +434,109 @@ Test suite at M2.8 close: 168/168 (no new tests this milestone — the renderer 
 - **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.7 carry-forward.
 - **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.7 carry-forward.
 
+### M2.9 — Viewer maturity arc (zoom + pan constraints, streets refresh, plot info anchoring)
+
+**✅ Completed 2026-05-11 late night on Balice 773.** What was scoped at M2.8 close as a small "zoom range lock + optional camera center soft-constraint" milestone grew across the ack cycle into a coherent viewer-maturity arc as each iteration's visual ack surfaced the next-most-prominent rough edge. Seven commits land four orthogonal improvements:
+
+1. **Camera-constraint pair** — zoom-out hard cap (C1) + plot-centered lateral pan rubber-band (C2) — addresses the M2.8 floating-mesa observation AND the deeper "Balice 773 should always be the page's foreground subject" depth-first invariant.
+2. **Streets refresh** — opacity bump (insufficient) → CartoDB Voyager → Stamen Toner Lines provider switch + Stamen Toner Labels companion — restores the navigable-anchor function that the M2.7 streets layer lost once the M2.8 contour + slope overlays joined the imagery stack.
+3. **Plot info DOM overlay refactor** — succeeds the M2.7 C5 LabelGraphics entity with a screen-anchored `domOverlay` variant + new renderer kind; addresses "musi być zakotwiczony" stakeholder feedback that the world-anchored centroid label re-projected to different screen positions per camera angle.
+4. **Heading de-dupe tail fix** — caught at the DOM overlay's first visual ack pass.
+
+Visual ack passed end-to-end at `localhost:3000/plots/dzialka-balice-773`: the camera never reaches the GRID1↔World-Terrain seam, lateral pan beyond the 3 km rim rubber-bands back to the rim in the panning direction, streets read as bold-by-design ink linework with named places above, and the plot info card holds bottom-right corner anchoring across top-down / oblique / near-ground framings with the heading rendering as `Balice DZIAŁKA 773` (single occurrence).
+
+Seven commits on `main`:
+- `a4c46dd` feat(3d): zoom range lock — maximumZoomDistance 5km — M2.9 C1
+- `48199ea` feat(3d): plot-centered pan soft-constraint — M2.9 C2
+- `ecd9a30` feat(overlays): streets opacity bump for prominence — M2.9 iteration
+- `6f11a7d` feat(overlays): switch streets to Stamen Toner Lines — M2.9 iteration
+- `f08fd78` feat(overlays): street name labels via Stamen Toner Labels — M2.9
+- `5786f44` refactor(overlays): plot info card as DOM overlay for stable anchoring
+- `c7c4ab5` fix(overlays): de-dupe DZIAŁKA word in plot info card heading
+
+#### C1 — Zoom range lock (`maximumZoomDistance = 5000 m`)
+
+`ScreenSpaceCameraController.maximumZoomDistance = 5000 m` caps the wheel + middle-click zoom-out path at the altitude envelope where the GRID1 plot-vicinity bake ends and Cesium World Terrain's ~30 m global default takes over. The mismatch is fundamental (plot-vicinity 1 m bake island in a coarser default sea); the right fix is to keep the camera inside the bake's altitude envelope rather than try to widen the bake. At our default ~45° flyby pitch this ground-projects to roughly a 5 km radius footprint from the plot centroid — the floating-mesa seam never enters the frame. The M2.5-E C2 wheel inertia (0.93) decelerates smoothly on approach so the user reads a soft arrival rather than a stop-wall. Tuning knob 3000–8000 m. Single-property write adjacent to the existing `inertiaZoom` wire on the same controller.
+
+#### C2 — Plot-centered pan soft-constraint (3 km rubber-band rim)
+
+Companion to C1. With zoom bounded the user can still drag the camera laterally far enough to lose Balice 773 from the frame, which defeats the depth-first showcase posture. Cesium has no native `maximumPanDistance` knob (`constrainedAxis` is for tilt, not translation), so the implementation registers a `camera.moveEnd` listener and rubber-bands the camera back when its ground-projected position drifts more than `MAX_PAN_DISTANCE_M` (3 km) from the plot centroid.
+
+Architectural choices:
+- **Pullback to the rim, not the centroid.** Scaling the camera's lateral offset by `MAX_PAN_DISTANCE_M / groundDistance` places the destination on the boundary circle in the same compass direction the user was panning. Reads as a tether release at the edge of a planimeter disc — soft, not snap-recenter. The motion itself IS the constraint cue; no extra visual ring or flash.
+- **On-stop, not per-frame.** Per-frame pullback would fight the M2.5-E C2 wheel inertia (0.93 retention) and read as jitter. The `moveEnd` event fires once after the user releases input, so the rubber-band motion is a clean single arc with `QUADRATIC_OUT` easing over 0.8 s (matches the M2.5-D C4 reset thunk character so the two automated camera motions feel related).
+- **`isAutoFlying` flag prevents self-feedback.** Starts `true` (initial setView + flyTo are automated), flips `false` on initial flyTo `complete`, re-arms during pullback flyTo, releases on pullback `complete` / `cancel`. Without it the pullback's own `moveEnd` would trigger another pullback in an infinite loop.
+- **Camera orientation preserved.** Heading / pitch / roll captured at the moment of pullback are passed through to the destination — only the lateral position is corrected. The user's chosen framing survives.
+- **Ground-projected distance.** Camera position and plot centroid both projected to ellipsoid height 0 before measuring, so high-altitude orbits don't inflate the lateral distance with camera altitude.
+
+The `moveEnd` listener's `removeListener` is pushed into `overlayDisposers` so the subscription tears down cleanly on viewer destroy alongside the layer renderer disposers — same disposer-discipline pattern the M2.7 C2 `tilesetRenderer` introduced.
+
+#### Streets iteration — Voyager → 0.80 bump → Stamen Toner Lines provider switch + Toner Labels companion
+
+What the M2.7 C4 visual ack signed off as "subtle ink-and-clay road network anchoring urban context" became visually subordinated by the M2.8 contour + slope overlays joining the imagery stack. The streets layer's `voyager_only_labels` palette was sized for a 3-overlay stack (polygon + streets + plot info) where it sat above ortofoto alone; once cartographic-detail overlays arrived between ortofoto and streets, plus the M2.9 zoom cap kept the camera at plot-vicinity altitudes where streets matter most as navigable context, the "where am I in Balice" anchor function was gone.
+
+Three iteration steps across separate atomic commits:
+
+1. **Opacity bump 0.55 → 0.80** (`ecd9a30`) — single-constant edit, Bucket #1 tuning knob. Insufficient on ack: even at 0.80 the editorial paper-and-clay Voyager palette stayed buried.
+2. **Provider switch to Stamen Toner Lines via Stadia Maps** (`6f11a7d`) — multi-file iteration. Toner Lines is bold-by-design high-contrast black linework on transparent ground, so a moderate layer α (0.65, lower than Voyager's failed 0.80) restored prominence without crossing the polygon-as-foreground invariant. Drops the `{s}` subdomain rotation (Stadia serves single origin) + Stadia's `{r}` retina suffix (Cesium `UrlTemplateImageryProvider` can't substitute it). Max level 18 (vs. Voyager's 19; plot-vicinity altitudes never exceed z18 either, so this matches without truncation). Free dev tier accepts unauthenticated localhost requests; production API key handling parked to M3+ as a natural site for per-layer auth + per-environment tile origins. Plakietka caption row updated to `Ulice · Stamen Toner Lines · OSM`. Test fixtures in renderer test files mentioning "CartoDB Voyager" deliberately left untouched (generic renderer inputs, not live-config assertions; historical chronology markers in docstrings).
+3. **Stamen Toner Labels companion** (`f08fd78`) — separate atomic layer registration. With lines alone the anchor function is geometric only; buyers see road shapes but not the names that turn shapes into navigation. Labels overlay street + place name text at layer α 0.85 above the linework (`ORTO → slope → contour → streets lines → streets labels`). Independent layer so M3 can toggle linework and labels separately — useful for screenshot framing where text might clutter, or the inverse case where only names are wanted as a sketch. Plakietka grows to 7 caption rows (adds `Nazwy ulic · Stamen Toner Labels · OSM`); indicator count grows to 6 active overlays via the existing M2.7 C6 `subscribe` channel — no React state churn, the subscription handles the increment automatically.
+
+Editorial caveat held for review and parked: pure-black Toner Lines may read "Google Earth generic" against the paper / clay / ink Atelier DNA. Stakeholder ack on M2.9 close read it as acceptable ("ulice mają obrys, w miarę widoczne, kontynuujemy") but flagged the brand-fit concern for a future iteration. The parked next step is custom-rendering the streets layer with an ink-color stroke via vector tile pipeline OR server-side recolor of the raster bake — M3+ territory, standalone milestone, not a Bucket #1 iteration knob.
+
+#### Plot info card DOM overlay refactor + new `domOverlay` renderer kind
+
+The M2.7 C5 plot info pill was a Cesium `LabelGraphics` entity anchored at the polygon centroid via `DistanceDisplayCondition` (hides past 2 km) and a pixel offset (lifts 32 px above the anchor). The world-anchoring meant the label re-projected to different screen positions per camera angle — top-down put it inside the polygon, oblique pushed it offset, near-ground sometimes hid it behind the relief. Stakeholder M2.9 ack: "musi być zakotwiczony" — the card needs to be a fixed UI chrome element, not a world feature.
+
+**Architectural choice — Option α (foundation extension over carve-out):** extend the `OverlayGeometry` discriminated union with a new `domOverlay` variant rather than carve out a plot-info-specific code path. The trade-off was a few extra files (types + renderer + dispatcher case + tests) vs. one less abstraction. Option α won because the same DOM-overlay primitive is the right shape for several near-future clients (plot stats card, owner badge, permit notice, screenshot watermark — all viewer-UI content that exists IN the viewer but isn't anchored to anything in 3D space), and M3's layer panel can treat `domOverlay` like any other registered layer (toggle for screenshot mode, surface in the panel UX) without special-casing.
+
+Why a new variant vs. extending `LabelGeometry`:
+- Screen-anchored content has no meaningful `DistanceDisplayCondition` — it's not in the world. World-anchored content has no meaningful corner anchor — it's at a coordinate. Forcing both into one variant would create an impossible-states API where half the fields apply per instance.
+- The discriminated union keeps the dispatcher's exhaustiveness check intact. TypeScript narrows `layer.geometry` to `never` in the default branch; a future union extension that forgets a dispatcher case fails the build at the dispatcher site, not silently in production.
+
+Renderer (`src/lib/overlays/renderers/domOverlayRenderer.ts`):
+- Mounts a styled `<aside>` element into `viewer.container` (the Cesium-owned DOM that wraps the canvas) via `viewer.container.ownerDocument.createElement(...)`. Reading `ownerDocument` off the container — not the `document` global — lets the test harness inject a mock container without depending on a real DOM environment (vitest runs in `node`).
+- Inline styles only, no Tailwind classes. The `tailwind.config.ts` content scan is scoped to `src/{pages,components,app}`; `lib/overlays/renderers/` falls outside it, so className strings referenced from this file wouldn't be extracted into the build. Inline styles bypass the scanner entirely and keep the `lib/overlays/` renderers free of any UI-framework dependency. Atelier palette (paper-DEFAULT, line-DEFAULT, ink-DEFAULT, clay-DEFAULT, ink-body) + font CSS variables (`--font-display`, `--font-mono`) baked into the inline styles directly.
+- Responsive inset via `clamp(12px, 2vw, insetPx)` gives ~12 px on narrow viewports (where 2vw is below 12 px) and the user-specified max on wider ones (where 2vw exceeds insetPx). Single-line responsive tightening with no JS resize listener.
+- Multi-line typography differentiated by line index per the convention documented on `DomOverlayGeometry`: line 0 = display (Fraunces), line 1 = numeric clay-toned (JetBrains Mono), line 2+ = body mono uppercase tracking. Future DOM-overlay types with different typographic hierarchies can migrate to a per-line type when a concrete second client lands.
+- `z-index: 20` (above the M2.7 C6 indicator's `z-10`, below any future fullscreen modal which should reserve `z-30+`). `pointer-events: none` lets click + drag pass through to Cesium — the card is purely informational.
+
+`Plot3DViewClient.tsx` cleanup with the refactor: the centroid math (`labelRing`, `labelLngSum`, `labelLatSum`, `labelCentroidLng`, `labelCentroidLat`) is gone — domOverlay needs no world position. All five `PLOT_INFO_*` constants (`MAX_VISIBLE_DISTANCE_M`, `PIXEL_OFFSET_Y`, `TEXT_COLOR`, `BACKDROP_COLOR`, `FONT`) deleted — label-specific tuning that the new renderer owns inline. The layer registration stays in the registry (`id: "plot-info-balice-773"`) so M3's panel can toggle visibility (useful for screenshot mode + future Phase B per-`viewMode` defaults); the M2.7 C5 deliberate plakietka-attribution skip stays in effect (derived view of the polygon's ULDK source, already credited under granice — no new provenance row).
+
+#### Heading de-dupe tail iteration
+
+Visual ack on the DOM overlay refactor surfaced `Balice DZIAŁKA DZIAŁKA 773` in the heading. Root cause: `parcelLabel` is constructed at `src/app/plots/[slug]/page.tsx:458–460` as `` `DZIAŁKA ${geometry.parcelNumber}` `` when `parcelNumber` is present, so for Balice 773 the prop arrives at `Plot3DViewClient` as the literal string `"DZIAŁKA 773"`. The Sub-task B refactor template hard-coded a second `"DZIAŁKA "` literal (`` `Balice DZIAŁKA ${labelParcel}` ``), producing the doubled word. The M2.7 C5 LabelGraphics variant this refactor succeeded had `` `Balice ${labelParcel}` `` and rendered correctly; the duplication was a regression introduced when re-inlining the brief's sample shape into the template. Single-line fix: drop the literal `"DZIAŁKA "` and rely on `parcelLabel`'s own prefix that page.tsx already encodes. The fallback chain (`parcelLabel ?? parcelNumber ?? terytId ?? "działka"`) also reads more gracefully without the extra literal — `Balice 773` from the parcelNumber fallback for a plot whose caller didn't pass `parcelLabel`, instead of the otherwise-ungrammatical `Balice DZIAŁKA 773` with a bare number. Test fixtures in `domOverlayRenderer.test.ts` and `renderOverlay.test.ts` encode the FINAL expected text `"Balice DZIAŁKA 773"` — those remain correct because in production the template produces exactly that string.
+
+#### Visual ack — 2026-05-11 late night (end-to-end)
+
+Stakeholder confirmed across the full M2.9 stack at `localhost:3000/plots/dzialka-balice-773`:
+- Wheel zoom-out stops cleanly near 5 km altitude; M2.5-E inertia gives soft arrival, no stop-wall feel.
+- Lateral pan beyond the 3 km rim rubber-bands back on release with a single QUADRATIC_OUT arc in the same compass direction the user was panning — plot Balice 773 always recovers into view.
+- Floating-mesa effect from the M2.8 zoom-out image is gone — the camera never reaches the altitude where the GRID1↔World-Terrain seam enters the frame.
+- Stamen Toner Lines streets read as bold-but-subordinate ink linework; Stamen Toner Labels names readable above without clutter dominance.
+- Plot info card holds bottom-right corner across top-down / oblique / near-ground camera framings (the structural fix the LabelGraphics variant couldn't deliver); heading reads `Balice DZIAŁKA 773` (single, no duplication); responsive inset tightens on narrow viewports via `clamp()`; Atelier paper-and-clay editorial typography preserved.
+- Indicator top-left reads `6 nakładek aktywnych` with correct genitive-plural grammar (same `pluralizeNakladka` branch as n=5 — lastDigit 6 falls outside the 2–4 "few" form band, no helper patch).
+- Plakietka caption row order: granice działki → ulice → nazwy ulic → poziomice → nachylenie → teren → ortofoto (7 segments).
+- All M2.5 ×2 exaggeration / M2.6 sun + NW rake lighting / M2.7 polygon + drape glow / M2.8 contour + slope overlays preserved. No FPS regression vs. M2.8 baseline.
+
+Test suite at M2.9 close: **178/178 (+10 since M2.8 close — 9 new in `domOverlayRenderer.test.ts` covering element creation, accessibility, multi-line typography by index, corner anchor positioning, custom insetPx, all four anchor corners, disposer cleanup, wrong-kind guard; +1 dispatcher case in `renderOverlay.test.ts` asserting domOverlay routes to viewer.container, NOT through entities).** tsc + lint clean.
+
+**Renderer-kind census at M2.9 close:**
+- Union has 6 kinds: `polygon | polyline | raster | tileset | label | domOverlay` (+1 vs. M2.8 — `domOverlay` added).
+- Dispatcher wires 5 of 6 (polyline parked — type-only, no consumer yet).
+- 6 active layer instances across 3 active renderer kinds: **raster=4** (slope + contour + streets lines + streets labels), **polygon=1** (plot-balice-773), **domOverlay=1** (plot-info-balice-773). The 6 the indicator reads is the layer-instance count, not the renderer-kind count.
+- Foundation kept warm: `label` + `tileset` renderers + their full test suites stay live with no production consumer. Same posture as M2.7 — the foundation is the cheap part; deciding what's worth registering is the load-bearing decision.
+
+#### Parked for M3 / M16 / Phase B (carry-forward post-M2.9)
+
+- **M3 layer control panel UI** — still parked; queues next in the depth-first stack (was after M2.7, then M2.8, then M2.9). Foundation is fully demonstration-ready: 6 layer instances across 3 active renderer kinds, dispatcher wires 5 of 6 union kinds, the dynamic indicator + plakietka are proven proof-points that the registry-driven `subscribe` channel works at n=6. M3 binds toggle UX to the same channel; URL params (`?layers=...`) surface shareable state; Phase B's `viewMode: "buyer" | "investor" | "developer"` plumbing rides on the same panel as internal-toggle infrastructure. The `domOverlay` plot info card is the first registered layer that's "viewer chrome by default"; M3's toggle UX will need a small carve-out treatment for it (screenshot-mode hides it; per-`viewMode` defaults can re-show / re-hide).
+- **Vector tile / server-side recolor for "Atelier ink streets"** — parked for **M3+ / Phase B premium tier**. Editorial concern from the Toner Lines provider switch ack: pure-black linework may read "Google Earth generic" against the paper / clay / ink Atelier DNA. The replacement candidate is either a vector tile pipeline (MapLibre vector → Cesium imagery via canvas render) or a server-side raster bake that recolors Stamen tiles to the Atelier ink palette. Standalone milestone, not a Bucket #1 iteration — touches a new rendering pathway, not a tuning knob. Phase A continues on the Toner Lines + Toner Labels pair until brand-fit blocks a sales conversation.
+- **"Alive terrain" (photogrammetric mesh)** — parked for **Phase B premium tier**. The decision whether to layer a photogrammetric textured mesh (Cesium ION / Bentley Acute3D-style) over the editorial NMT base to produce a "living terrain" read is deferred until Phase B subscription economics validate the per-plot processing cost. Phase A continues on the bake-and-style NMT GRID1 surface only. Unchanged from M2.8 carry-forward; restated here so the parked stack stays self-contained at M2.9 close.
+- **Bucket #2 — true thicker index contours via `ST_Buffer` pre-rasterize.** Still parked from M2.8. If a later visual-ack pass calls the opacity-only minor/index differentiation insufficient, the iteration is to pre-buffer the index vectors with `ST_Buffer` in the SQLite dialect before `gdal_rasterize`, producing real wider polygons.
+- **Production API key handling for Stadia Maps** — parked for **M3+**. Free dev tier accepts unauthenticated localhost requests; production deploy will need a per-layer / per-environment tile origin config. The M3 layer panel is the natural site to wire this (per-layer config object already part of the registry shape).
+- **Per-line typography in `DomOverlayGeometry`** — parked. The flat `lines: ReadonlyArray<string>` array with index-based typography (line 0 display, line 1 numeric, line 2+ body) matches the M2.7 C5 plot info shape and the editorial register the plakietka already uses. When a concrete second `domOverlay` client lands with a different hierarchy (owner badge, permit notice), the migration to a per-line type is straightforward.
+- **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.7 carry-forward.
+- **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.7 carry-forward.
+
 ### M3 — Layer control panel UI (gateway for M4–M7) + UI mode foundation
 
 **Scope:** Editorial sidebar/overlay component in Atelier style (Fraunces section header, Instrument Sans labels, JetBrains Mono metadata, paper background, soft border). Initial state: 7 toggles, all OFF except "Ortofoto" (always-on baseline). State held in URL params (`?layers=orto,mpzp,kiut`) for shareable links. Mobile: bottom-sheet collapse pattern.
