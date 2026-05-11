@@ -29,6 +29,7 @@ import { renderOverlay } from "@/lib/overlays/renderOverlay";
 import type { OverlayDisposer } from "@/lib/overlays/types";
 import { getTerrainStorage } from "@/lib/terrain/storage";
 
+import { LayerPanel } from "./LayerPanel";
 import type { Plot3DViewProps } from "./Plot3DView";
 
 declare global {
@@ -360,11 +361,18 @@ export function Plot3DViewClient({
   // toggles the 300 ms opacity fade just before unmount.
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFading, setIsLoadingFading] = useState(false);
-  // M2.7 C6 — visible-overlay count derived from the LayerRegistry's
-  // subscribe channel. Hardcoded "1 nakładka aktywna" in page.tsx
-  // (M2.5-B) is gone — the indicator now reflects the actual registry
-  // state so M3's toggle UX flips this label without extra plumbing.
-  const [visibleOverlayCount, setVisibleOverlayCount] = useState(0);
+  // M2.7 C6 → M3 C1 — LayerRegistry instance lifted into component
+  // state so the new `LayerPanel` UI can subscribe to it as a prop.
+  // The viewer init IIFE below creates a fresh `LayerRegistry`,
+  // populates it via `add()` calls, then publishes it through
+  // `setLayerRegistryState`. The panel reads `getAll()` + subscribes
+  // to mutation events, so the M2.7 C6 "X nakładek aktywnych"
+  // indicator now lives inside LayerPanel as its collapsed-state
+  // pill — no more duplicate count state at this layer. On effect
+  // teardown the state goes back to null so LayerPanel renders
+  // nothing across the re-init render gap.
+  const [layerRegistryState, setLayerRegistryState] =
+    useState<LayerRegistry | null>(null);
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -623,19 +631,14 @@ export function Plot3DViewClient({
       // render through the same pipeline. The semantic slug
       // (`plot-balice-773`) keeps share-URLs and panel UX free of raw
       // cadastral ids.
+      // M3 C1 — registry instance lives in effect-local scope; the
+      // M2.7 C6 subscribe wiring that mirrored visible-count into
+      // component state moves into the new `LayerPanel`, which
+      // reads + subscribes via the `registry` prop. The
+      // `setLayerRegistryState` publish below makes the instance
+      // visible to the JSX so LayerPanel can mount once add() calls
+      // are done.
       const layerRegistry = new LayerRegistry();
-      // M2.7 C6 — bind the React indicator state to the registry's
-      // subscribe channel BEFORE the initial `add()` calls so the four
-      // M2.5-B + M2.7 registrations seed the count via the same code
-      // path future M3 panel toggles will use. setState is batched, so
-      // four notifications collapse into a single re-render.
-      const unsubscribeFromRegistry = layerRegistry.subscribe(() => {
-        if (disposed) return;
-        setVisibleOverlayCount(layerRegistry.getVisible().length);
-      });
-      // Cleanup hook stored alongside the other disposers; runs in the
-      // effect teardown below.
-      overlayDisposers.push(unsubscribeFromRegistry);
 
       layerRegistry.add({
         id: plotLayerIdForTerytId(geometry.terytId),
@@ -820,6 +823,12 @@ export function Plot3DViewClient({
         overlayDisposers.push(dispose);
       }
 
+      // M3 C1 — publish the registry instance to component state so
+      // LayerPanel can subscribe to it. Done AFTER the initial `add()`
+      // calls so the panel's first render sees a populated registry
+      // and skips the empty-state flash.
+      setLayerRegistryState(layerRegistry);
+
       // Camera positioning still needs an absolute ground baseline (the camera
       // is in WGS84 ECEF, not terrain-relative). Sample once to anchor the
       // initial top-down view + fly-to altitude relative to actual elevation.
@@ -1002,6 +1011,11 @@ export function Plot3DViewClient({
       if (viewer) viewer.destroy();
       viewerHandleRef.current = null;
       resetCameraRef.current = null;
+      // M3 C1 — drop the registry handle so LayerPanel renders
+      // nothing across the re-init render gap (deps change ->
+      // cleanup -> re-run); the next effect run publishes a fresh
+      // instance.
+      setLayerRegistryState(null);
     };
     // Geometry is plot-scoped; route navigation unmounts the viewer, so a
     // stable terytId is sufficient as the re-init key.
@@ -1092,25 +1106,15 @@ export function Plot3DViewClient({
           </div>
         </div>
       )}
-      {/* M2.7 C6 + C9 → M2.8 C5 → M2.9 — registry-bound layer count
-          indicator. Replaces the M2.5-B hardcoded "1 nakładka aktywna"
-          span that lived in page.tsx; the count now derives from
-          LayerRegistry.subscribe (6 active after M2.9: polygon + slope
-          + contour + streets lines + streets labels + plot info).
-          pluralizeNakladka(6) returns the genitive-plural form so the
-          pill reads "6 nakładek aktywnych" — same carve-out branch as
-          n=5 (lastDigit 6 falls outside the 2-4 "few" form band), no
-          grammar patch needed. Pointer-events-none so the pill never
-          intercepts Cesium drag input. Positioned top-LEFT to avoid
-          colliding with the fullscreen toggle at top-right. */}
-      {visibleOverlayCount > 0 && (
-        <span
-          className="pointer-events-none absolute left-3 top-3 z-10 rounded-xs border border-line/40 bg-paper/85 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint"
-          data-testid="plot3d-overlay-count"
-        >
-          {visibleOverlayCount} {pluralizeNakladka(visibleOverlayCount)}
-        </span>
-      )}
+      {/* M2.7 C6 → M3 C1 — layer panel UI. The M2.7 indicator pill
+          ("X nakładek aktywnych") now lives as the panel's
+          collapsed-state trigger; clicking it expands the panel
+          chrome with section placeholders + layer rows. C2 wires
+          the toggle path through `LayerRegistry.setVisible`. The
+          registry instance is published from the viewer init effect
+          via `setLayerRegistryState`, so the panel mounts after the
+          initial `add()` calls have populated the registry. */}
+      <LayerPanel registry={layerRegistryState} />
       {/* M2.5-D C4 — recenter button bottom-left. Re-runs the initial
           flyTo via the closure-bound thunk in resetCameraRef. Visible
           regardless of activation state so the user can re-frame the
@@ -1160,28 +1164,6 @@ export function Plot3DViewClient({
   );
 }
 
-/**
- * M2.7 C6 — Polish pluralization for the layer-count indicator.
- *
- * Polish noun plurals split into three forms based on the count:
- *   - 1 → singular ("1 nakładka aktywna")
- *   - 2-4, 22-24, 32-34, … → "few" form ("2 nakładki aktywne"), with
- *     the carve-out that 12/13/14 use the "many" form
- *   - everything else (0, 5+, teens 11-19, etc.) → "many" form
- *     ("5 nakładek aktywnych")
- *
- * The carve-out for 12-14 is the standard rule — same logic Polish
- * grammar APIs (Intl.PluralRules pl-PL) apply.
- */
-function pluralizeNakladka(n: number): string {
-  if (n === 1) return "nakładka aktywna";
-  const lastDigit = n % 10;
-  const lastTwo = n % 100;
-  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) {
-    return "nakładki aktywne";
-  }
-  return "nakładek aktywnych";
-}
 
 /**
  * Target-reticle glyph for the recenter button. Editorial geometry:
