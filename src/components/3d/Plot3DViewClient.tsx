@@ -82,6 +82,31 @@ const VERTICAL_EXAGGERATION = 2.0;
 // if 0.93 still reads jumpy after visual ack, drop the per-notch zoom
 // factor (private `_zoomFactor`) by ~50% as a second-pass mitigation.
 const WHEEL_INERTIA_ZOOM = 0.93;
+// ADR-0006 M2.9 C1 — zoom-out hard cap. Stakeholder feedback on the
+// M2.8 visual-ack pass was "zablokujmy możliwość oddalania na tak
+// wielką skalę, nie ma to sensu" — the zoom-out range at M2.8 close
+// extended far enough that the camera reached altitudes where the
+// GRID1 plot-vicinity bake ends and Cesium World Terrain's ~30 m
+// global default takes over. The transition shows a hard seam:
+// the high-resolution bake reads as an elevated mesa floating
+// above the coarser default surround. This is a fundamental
+// LOD-mismatch (not an M2.8 bug — the bake area is a real
+// elevation island in a coarser default sea), so the fix is to
+// remove the camera distance at which the seam becomes
+// perceptually dominant rather than try to bake the whole region.
+//
+// `ScreenSpaceCameraController.maximumZoomDistance` is a hard cap
+// in metres above the ellipsoid that the controller's zoom-out
+// path will not cross. Cesium clamps to it natively + the wheel
+// inertia (M2.5-E C2) decelerates smoothly on approach, so the
+// user feels a soft arrival rather than a stop-wall. 5000 m sits
+// well inside the GRID1 bake's altitude envelope at our default
+// pitch (~45° flyby ground-projects to a 5 km radius footprint
+// from the plot centroid), so the seam never enters the frame.
+// Tuning knob 3000–8000 m: tighter values privilege the plot at
+// the cost of urban context, looser values risk the seam
+// returning.
+const MAX_ZOOM_DISTANCE_M = 5000;
 // ADR-0006 M2.6 C1 — globe lighting fade distances. Cesium's
 // `Globe.enableLighting` is gated by a distance-based fade so the
 // orbital-globe use case (lighting kicks in when you're far enough
@@ -469,6 +494,12 @@ export function Plot3DViewClient({
       // actually reach Cesium (i.e. post-activation). See
       // WHEEL_INERTIA_ZOOM rationale for the value choice.
       v.scene.screenSpaceCameraController.inertiaZoom = WHEEL_INERTIA_ZOOM;
+      // M2.9 C1 — zoom-out hard cap. Clamps wheel + middle-click zoom
+      // before the floating-mesa LOD seam between the GRID1 bake and
+      // Cesium World Terrain surround enters the frame. See
+      // MAX_ZOOM_DISTANCE_M rationale.
+      v.scene.screenSpaceCameraController.maximumZoomDistance =
+        MAX_ZOOM_DISTANCE_M;
 
       // M2.5-D C4 — loading-state machine. The paper skeleton overlay
       // stays in the tree until BOTH (a) at least 1500 ms have passed
