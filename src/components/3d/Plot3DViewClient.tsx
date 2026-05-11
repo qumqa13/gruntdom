@@ -880,13 +880,15 @@ export function Plot3DViewClient({
           </div>
         </div>
       )}
-      {/* M2.7 C6 + C9 — registry-bound layer count indicator. Replaces
-          the M2.5-B hardcoded "1 nakładka aktywna" span that lived in
-          page.tsx; the count now derives from LayerRegistry.subscribe
-          (3 active after the C8 buildings rollback: polygon + streets
-          + plot info label). pluralizeNakladka(3) returns the "few"
-          form so the pill reads "3 nakładki aktywne". Pointer-events-
-          none so the pill never intercepts Cesium drag input. Positioned
+      {/* M2.7 C6 + C9 → M2.8 C5 — registry-bound layer count indicator.
+          Replaces the M2.5-B hardcoded "1 nakładka aktywna" span that
+          lived in page.tsx; the count now derives from
+          LayerRegistry.subscribe (5 active after M2.8: polygon + slope
+          + contour + streets + plot info label). pluralizeNakladka(5)
+          returns the genitive-plural form so the pill reads "5 nakładek
+          aktywnych" — the carve-out logic already supports 5+ per the
+          M2.7 C6 helper, no grammar patch needed. Pointer-events-none
+          so the pill never intercepts Cesium drag input. Positioned
           top-LEFT to avoid colliding with the fullscreen toggle at
           top-right. */}
       {visibleOverlayCount > 0 && (

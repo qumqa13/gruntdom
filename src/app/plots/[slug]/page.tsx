@@ -473,14 +473,15 @@ function ShowcaseThreeDView({
           frontAzimuthDeg={geometry.frontAzimuth}
           parcelLabel={parcelLabel}
         />
-        {/* M2.5-B → M2.7 C6 + C9 — the "X nakładka aktywna" indicator
-            used to live here as a hardcoded "1" span. M2.7 lifted it
-            into Plot3DViewClient where the LayerRegistry is the source
-            of truth; the count now reflects actual registered overlays
-            (3 by default after the C8 buildings rollback: polygon +
-            streets + plot info). Future M3 panel toggles update the
-            indicator automatically through the registry's subscribe
-            channel — no extra plumbing needed at this layer. */}
+        {/* M2.5-B → M2.7 C6 + C9 → M2.8 C5 — the "X nakładka aktywna"
+            indicator used to live here as a hardcoded "1" span. M2.7
+            lifted it into Plot3DViewClient where the LayerRegistry is
+            the source of truth; the count now reflects actual
+            registered overlays (5 by default after M2.8: polygon +
+            slope + contour + streets + plot info). Future M3 panel
+            toggles update the indicator automatically through the
+            registry's subscribe channel — no extra plumbing needed at
+            this layer. */}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
@@ -507,15 +508,31 @@ function ShowcaseThreeDView({
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
         />
-        {/* M2.7 C6 + C9 — streets attribution row alongside the existing
-            granice + terrain + ortofoto provenance (4 rows total after
-            the C8 buildings rollback). The plot info label (M2.7 C5)
-            does NOT get its own row because it's a derived view of the
-            polygon's own data — same `ULDK GUGiK` source already
-            credited above. CartoDB Voyager / OSM surfaces the upstream
-            road-network origin so a buyer scanning the plakietka can
-            see what they're looking at. */}
+        {/* M2.7 C6 + C9 → M2.8 C5 — attribution rows. After M2.8 the
+            plakietka surfaces 6 caption segments: granice działki +
+            ulice + poziomice + nachylenie + teren + ortofoto. The plot
+            info label (M2.7 C5) does NOT get its own row because it's
+            a derived view of the polygon's own data — same
+            `ULDK GUGiK` source already credited under granice. The M2.8
+            "derived NMT GRID1" rows credit the source data AND the
+            specific GDAL tool (gdal_contour / gdaldem slope) so a
+            buyer scanning the plakietka can see both the
+            authoritative upstream + the derivation method. */}
         <span>Ulice · CartoDB Voyager · OSM</span>
+        <span
+          className="hidden h-3 w-px bg-line sm:inline-block"
+          aria-hidden
+        />
+        <span>
+          Poziomice · derived NMT GRID1 · 1 m intervals · gdal_contour
+        </span>
+        <span
+          className="hidden h-3 w-px bg-line sm:inline-block"
+          aria-hidden
+        />
+        <span>
+          Nachylenie · derived NMT GRID1 · 0-5/5-15/15-30/30%+ · gdaldem slope
+        </span>
         <span
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
