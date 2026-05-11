@@ -118,6 +118,17 @@ const LIGHTING_FADE_IN_DISTANCE_M = 1;
 // — until then `scene.light` is M2.6's editorial rake.
 const SUN_AZIMUTH_DEG = 315;
 const SUN_ALTITUDE_DEG = 30;
+// ADR-0006 M2.7 C3 — Cesium OSM Buildings tileset hosted on ION as
+// asset 96188. Free worldwide tier under the standard Cesium ION
+// account (no paid upgrade required for read access). The asset id
+// is a public Cesium account constant — if a future migration
+// re-hosts the OSM buildings under a different id, change here and
+// the registry pulls the new tileset on next mount. Editorial color
+// override drops the ION default white-glass cube look into the
+// Atelier paper/clay palette; final rgba tuned during the M2.7
+// visual ack.
+const CESIUM_OSM_BUILDINGS_ION_ASSET_ID = 96188;
+const BUILDINGS_TINT_RGBA = "rgba(228, 218, 196, 0.88)";
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -469,6 +480,27 @@ export function Plot3DViewClient({
         source: {
           label: "ULDK GUGiK",
           sourceId: geometry.terytId,
+        },
+      });
+
+      // M2.7 C3 — Cesium OSM Buildings (ION 96188, free worldwide).
+      // The tileset renderer's fail-soft posture (log + continue on
+      // load error) covers the no-token + network-flake cases — if
+      // ION is unreachable, the rest of the viewer keeps rendering.
+      // Editorial color override drops the default white-glass cube
+      // look into the Atelier paper/clay palette.
+      layerRegistry.add({
+        id: "buildings-balice",
+        name: "Budynki",
+        visible: true,
+        geometry: {
+          kind: "tileset",
+          ionAssetId: CESIUM_OSM_BUILDINGS_ION_ASSET_ID,
+        },
+        style: { color: BUILDINGS_TINT_RGBA },
+        source: {
+          label: "Cesium OSM Buildings",
+          sourceId: `ION ${CESIUM_OSM_BUILDINGS_ION_ASSET_ID}`,
         },
       });
 
