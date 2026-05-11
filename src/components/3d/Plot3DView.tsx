@@ -98,10 +98,23 @@ function Plot3DViewSkeleton({ label }: { label: string }) {
 /**
  * Editorial-style chrome button. Paper backdrop, ink-muted icon, thin
  * line border, square geometry — no Lucide colour, no glassmorphism.
- * Sits at z-10 in inline mode; bumped to z-[110] in fullscreen so the
- * close-affordance stays on top of every overlay layered inside the
- * viewer (the C1 click-to-interact gate at z-[15], any future M3
- * panel chrome, etc.).
+ *
+ * ADR-0006 M2.5-E — chrome z-stack policy: chrome corners (this toggle
+ * + the bottom-left reset button) are operable WITHOUT first arming the
+ * camera. The click-to-interact gate at z-[15] covers the viewer body
+ * but yields to the two 40×40 corner squares at z-[16], so a user can
+ * open fullscreen / recenter without going through an activation step
+ * they didn't ask for. The loading overlay still sits at z-[20] above
+ * everything, preserving the "no chrome interaction while terrain is
+ * streaming" invariant. In fullscreen mode the toggle jumps to z-[110]
+ * so the close-affordance stays on top of every overlay layered inside
+ * the viewer.
+ *
+ * Pre-M2.5-E history: the original M2.5-D C2 design (commit 9683174)
+ * placed the toggle at z-10 underneath the gate, intending an "activate
+ * first → chrome accessible" flow. Stakeholder feedback flipped that
+ * decision — chrome is navigation, not interaction; it should be a
+ * single-click affordance regardless of camera-arm state.
  */
 function FullscreenToggleButton({
   isFullscreen,
@@ -112,7 +125,7 @@ function FullscreenToggleButton({
 }) {
   const positionClass = isFullscreen
     ? "absolute right-4 top-4 z-[110]"
-    : "absolute right-3 top-3 z-10";
+    : "absolute right-3 top-3 z-[16]";
   const label = isFullscreen ? "Zamknij widok pełnoekranowy" : "Pełny ekran";
   return (
     <button

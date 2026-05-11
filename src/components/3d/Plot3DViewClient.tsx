@@ -564,11 +564,17 @@ export function Plot3DViewClient({
       {/* M2.5-D C4 — recenter button bottom-left. Re-runs the initial
           flyTo via the closure-bound thunk in resetCameraRef. Visible
           regardless of activation state so the user can re-frame the
-          plot without first activating the camera. */}
+          plot without first activating the camera.
+          M2.5-E — bumped to z-[16] so the chrome button stays clickable
+          above the activation gate at z-[15]. The gate still covers the
+          viewer body (the cesium canvas surface minus this 40×40 corner
+          and the symmetric top-right fullscreen toggle), so body-click
+          activation still works. Loading overlay at z-[20] continues to
+          mask the chrome during terrain streaming. */}
       <button
         type="button"
         onClick={() => resetCameraRef.current?.()}
-        className="absolute bottom-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card outline-none transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft focus-visible:ring-2 focus-visible:ring-clay/60"
+        className="absolute bottom-3 left-3 z-[16] flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card outline-none transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft focus-visible:ring-2 focus-visible:ring-clay/60"
         aria-label="Wycentruj widok na działkę"
         title="Wycentruj widok"
       >
