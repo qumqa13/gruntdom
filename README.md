@@ -34,6 +34,11 @@ npm run dev
 | `npm run build` | Production build (uses real Replicate token if set) |
 | `npm start` | Run production build |
 | `npm run lint` | Next.js lint |
+| `npm run build-terrain` | Bake Polish NMT 1m sheets → Cesium quantized-mesh tiles under `public/terrain-tiles/balice/` via the `tumgis/ctb-quantized-mesh` Docker image (ADR-0006 M2). Requires Docker Desktop. |
+
+## Terrain tiles (ADR-0006 M2)
+
+The Balice 773 showcase plot renders on real Polish 1m NMT terrain. Tiles are produced locally from PZGiK ASCII Grid sheets via a Docker pipeline (`tumgis/ctb-quantized-mesh`) and served either as Next.js static assets (`public/terrain-tiles/`, dev) or from Cloudflare R2 (`NEXT_PUBLIC_TERRAIN_BASE_URL`, production). Both paths are abstracted behind `src/lib/terrain/storage.ts`. The bake outputs are gitignored; rerun `npm run build-terrain` after pulling the repo. See `docs/runbooks/pzgik-nmt-download.md` for the NMT source-data spike.
 
 ## Project layout
 

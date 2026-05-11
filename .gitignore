@@ -71,3 +71,10 @@ src/data/__violation-fixture*.ts
 public/nmt/*.asc
 public/nmt/*.xyz
 public/nmt/*.xyz.zip
+
+# ADR-0006 M2 — quantized-mesh terrain tiles produced by `npm run build-terrain`
+# from the PZGiK NMT 1m sheets. Each tileset is hundreds of small `.terrain`
+# files plus a layer.json; full pyramid (~zooms 1–15) can run to tens of MB.
+# Dev path serves them as Next.js static assets; production targets Cloudflare
+# R2 + CDN via NEXT_PUBLIC_TERRAIN_BASE_URL. Never commit the bake outputs.
+public/terrain-tiles/
