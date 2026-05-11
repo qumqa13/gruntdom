@@ -82,6 +82,11 @@ describe("fetchWmsTile - layer routing (9 layers)", () => {
       layers: "Raster",
     },
     {
+      layer: WmsLayer.ORTO_STANDARD,
+      host: "mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution",
+      layers: "Raster",
+    },
+    {
       layer: WmsLayer.NMT,
       host: "mapy.geoportal.gov.pl/wss/ext/NMT/wms",
       layers: "nmt",
@@ -424,6 +429,25 @@ describe("fetchWmsTile - rate limiter (token bucket per-layer 1/30s)", () => {
     const error = await errorPromise;
 
     expect(error).toBeInstanceOf(WmsTimeoutError);
+  });
+
+  it("uses the per-layer 2s override for ORTO_STANDARD (3D-viewer tile-stream budget)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(new Date("2026-05-11T12:00:00.000Z"));
+    const fetchSpy = mockFetch();
+
+    // 1st network call consumes the only token.
+    await fetchWmsTile(WmsLayer.ORTO_STANDARD, bboxA);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // 2nd fresh-bbox call — must wait the per-layer 2s window, NOT 30s.
+    const pending = fetchWmsTile(WmsLayer.ORTO_STANDARD, bboxB);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(2);
+    await pending;
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it("does not consume a token on cache hit", async () => {

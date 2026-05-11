@@ -41,6 +41,7 @@ export class WmsBadResponseError extends WmsError {
 
 export enum WmsLayer {
   ORTO_HR = "ORTO_HR",
+  ORTO_STANDARD = "ORTO_STANDARD",
   NMT = "NMT",
   EGIB_DZIALKI = "EGIB_DZIALKI",
   EGIB_NUMERY_DZIALEK = "EGIB_NUMERY_DZIALEK",
@@ -106,6 +107,10 @@ const LAYER_REGISTRY: Record<WmsLayer, LayerEntry> = {
     host: "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution",
     layers: "Raster",
   },
+  [WmsLayer.ORTO_STANDARD]: {
+    host: "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution",
+    layers: "Raster",
+  },
   [WmsLayer.NMT]: {
     host: "https://mapy.geoportal.gov.pl/wss/ext/NMT/wms",
     layers: "nmt",
@@ -144,6 +149,13 @@ const TILE_SIZE = 512;
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const DEFAULT_TIMEOUT_MS = 30_000;
 const RATE_LIMIT_INTERVAL_MS = 30_000; // ADR-0002 §2.8: 1 req/30s/layer/IP
+// Per-layer overrides for tile-streaming consumers (3D viewer, etc.) that need
+// higher cold-cache throughput. ADR-0006 M1: ORTO_STANDARD streams to Cesium's
+// imagery provider — 1/30s would stall the initial viewer load. 1/2s = 30
+// reqs/min, still inside the §2.8 burst-safe budget.
+const RATE_LIMIT_INTERVAL_OVERRIDES: Partial<Record<WmsLayer, number>> = {
+  [WmsLayer.ORTO_STANDARD]: 2_000,
+};
 const MONITOR_WINDOW_MS = 60_000;
 const MONITOR_THRESHOLD = 30; // requests/min before we warn
 
@@ -252,7 +264,9 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
 function bucketFor(layer: WmsLayer): TokenBucket {
   let b = buckets.get(layer);
   if (!b) {
-    b = new TokenBucket(1, RATE_LIMIT_INTERVAL_MS);
+    const interval =
+      RATE_LIMIT_INTERVAL_OVERRIDES[layer] ?? RATE_LIMIT_INTERVAL_MS;
+    b = new TokenBucket(1, interval);
     buckets.set(layer, b);
   }
   return b;
