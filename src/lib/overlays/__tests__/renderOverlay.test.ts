@@ -76,6 +76,34 @@ function makeCesium() {
     },
   };
 
+  // M2.9 — `domOverlay` renderer mounts an element into
+  // `viewer.container`. The mock container exposes an
+  // `ownerDocument.createElement` factory + an `appendChild` spy so
+  // the dispatcher test can assert the DOM-side path was taken
+  // without needing a real DOM environment (vitest runs in `node`).
+  const containerChildren: unknown[] = [];
+  const makeMockElement = () => ({
+    dataset: {} as Record<string, string>,
+    style: {} as Record<string, string>,
+    children: [] as unknown[],
+    textContent: "",
+    appendChild(child: unknown) {
+      this.children.push(child);
+      return child;
+    },
+    setAttribute(_k: string, _v: string) {},
+    remove() {},
+  });
+  const container = {
+    ownerDocument: {
+      createElement: vi.fn(() => makeMockElement()),
+    },
+    appendChild: vi.fn((el: unknown) => {
+      containerChildren.push(el);
+      return el;
+    }),
+  };
+
   const viewer = {
     entities: {
       add: vi.fn((entity: MockEntity) => {
@@ -101,6 +129,7 @@ function makeCesium() {
         remove: vi.fn(),
       },
     },
+    container,
   };
 
   return {
@@ -109,6 +138,7 @@ function makeCesium() {
     entitiesAdded,
     primitivesAdded,
     imageryLayersAdded,
+    containerChildren,
     resolveTileset: () => {
       const t: MockTileset = { destroy: vi.fn() };
       resolveTileset?.(t);
@@ -177,6 +207,21 @@ function labelLayer(): OverlayLayer {
   };
 }
 
+function domOverlayLayer(): OverlayLayer {
+  return {
+    id: "plot-info",
+    name: "Plot info",
+    visible: true,
+    geometry: {
+      kind: "domOverlay",
+      lines: ["Balice DZIAŁKA 773", "711 m²", "Maks. zabudowa 213 m²"],
+      anchor: "bottom-right",
+    },
+    style: { color: "#15171A" },
+    source: { label: "x" },
+  };
+}
+
 describe("renderOverlay (dispatcher)", () => {
   it("routes polygon → polygon renderer (entities collection)", () => {
     const { Cesium, viewer, entitiesAdded } = makeCesium();
@@ -218,6 +263,20 @@ describe("renderOverlay (dispatcher)", () => {
     });
     expect(entitiesAdded).toHaveLength(1);
     expect(entitiesAdded[0]?.name).toContain("· label");
+  });
+
+  it("routes domOverlay → DOM renderer (viewer.container child)", () => {
+    const { Cesium, viewer, containerChildren, entitiesAdded } = makeCesium();
+    renderOverlay(domOverlayLayer(), {
+      Cesium: Cesium as never,
+      viewer: viewer as never,
+    });
+    // Side effect must land on viewer.container, NOT entities — the
+    // domOverlay variant lives in the DOM tree, not the Cesium scene
+    // graph. If a future refactor accidentally routes it through the
+    // entity / imagery / primitive collections, this assertion fails.
+    expect(containerChildren).toHaveLength(1);
+    expect(entitiesAdded).toHaveLength(0);
   });
 
   it("throws on polyline (renderer parked)", () => {

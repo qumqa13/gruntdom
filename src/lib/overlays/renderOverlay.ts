@@ -20,6 +20,7 @@
 
 import type * as Cesium from "cesium";
 
+import { renderDomOverlay } from "./renderers/domOverlayRenderer";
 import { renderLabelOverlay } from "./renderers/labelRenderer";
 import { renderPolygonOverlay } from "./renderers/polygonRenderer";
 import { renderRasterOverlay } from "./renderers/rasterRenderer";
@@ -51,6 +52,8 @@ export function renderOverlay(
       return renderTilesetOverlay(layer, deps);
     case "label":
       return renderLabelOverlay(layer, deps);
+    case "domOverlay":
+      return renderDomOverlay(layer, deps);
     case "polyline":
       throw new Error(
         `renderOverlay: polyline renderer not implemented (layer "${layer.id}")`,

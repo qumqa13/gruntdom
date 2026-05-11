@@ -266,17 +266,17 @@ const SLOPE_TILES_URL =
   "/terrain-tiles/slope/balice/{z}/{x}/{y}.png";
 const SLOPE_TILES_MAX_LEVEL = 19;
 const SLOPE_OPACITY = 0.25;
-// ADR-0006 M2.7 C5 — plot info label visibility threshold. Hidden
-// past 2 km because the multi-line pill becomes illegible noise at
-// Małopolska-scale framing; visible inside that band where the
-// polygon footprint is large enough on screen to anchor the
-// callout meaningfully. Pixel offset lifts the pill 32 px above
-// the anchor so it doesn't overlap the polygon's clay outline.
-const PLOT_INFO_MAX_VISIBLE_DISTANCE_M = 2000;
-const PLOT_INFO_PIXEL_OFFSET_Y = -32;
-const PLOT_INFO_TEXT_COLOR = "#2d2a26";
-const PLOT_INFO_BACKDROP_COLOR = "rgba(244, 238, 223, 0.95)";
-const PLOT_INFO_FONT = "11px 'JetBrains Mono', monospace";
+// ADR-0006 M2.9 Bucket #2 polish — plot info card switched from a
+// world-anchored Cesium `LabelGraphics` entity (M2.7 C5) to a
+// screen-anchored DOM overlay. Stakeholder feedback on M2.9 visual
+// ack: "musi być zakotwiczony" — the world-anchored variant
+// re-projected to different screen positions per camera angle,
+// breaking the fixed-UI-card reading. DOM anchoring is the
+// structural fix; the renderer + corner anchor + responsive inset
+// all live inside the new `domOverlay` variant (see
+// `src/lib/overlays/types.ts` and `domOverlayRenderer.ts`). No
+// per-layer constants needed at this site anymore — the renderer
+// owns the Atelier palette + typography stack.
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -660,8 +660,11 @@ export function Plot3DViewClient({
       // build-terrain:slope`. Registered FIRST among the raster
       // overlays so the imagery stack reads, bottom-up: ORTO →
       // slope wash → contour hairlines → streets navigable
-      // foreground. The polygon entity + plot info label sit
-      // above all imagery (Cesium draws entities after imagery).
+      // foreground. The polygon Cesium entity draws above all
+      // imagery (Cesium draws entities after imagery); the plot
+      // info card is a DOM overlay mounted into viewer.container,
+      // so it sits in the DOM stack above the canvas regardless of
+      // imagery layer order.
       //
       // Layer alpha 0.25 keeps the editorial bands subordinate to
       // the polygon as foreground subject. The per-pixel α in the
@@ -752,23 +755,21 @@ export function Plot3DViewClient({
         source: { label: "Stamen Toner Labels", sourceId: "OSM" },
       });
 
-      // M2.7 C5 — plot info label anchored at the polygon centroid.
-      // Three-line callout (parcel + area + Maks-zabudowa) auto-hides
-      // past 2 km via DistanceDisplayCondition so the pill doesn't
-      // float over the Małopolska view where it'd be illegible.
-      // Centroid is the average of the polygon's unique vertices
-      // (closing duplicate skipped) — a true polygon centroid would
-      // weight by edge length but for a 60 m × 50 m parcel the visual
-      // difference is sub-pixel; vertex-average is cheap, deterministic,
-      // and works on any boundary that has at least 3 unique vertices.
-      // Area + Maks-zabudowa values are the stakeholder-spec'd Balice
-      // 773 constants — Phase A.5 mass replication will lift them
-      // through a per-plot data binding alongside the polygon itself.
-      const labelRing = geometry.boundary.slice(0, -1);
-      const labelLngSum = labelRing.reduce((acc, [lng]) => acc + lng, 0);
-      const labelLatSum = labelRing.reduce((acc, [, lat]) => acc + lat, 0);
-      const labelCentroidLng = labelLngSum / labelRing.length;
-      const labelCentroidLat = labelLatSum / labelRing.length;
+      // M2.9 Bucket #2 — plot info card as DOM overlay. Successor to
+      // the M2.7 C5 LabelGraphics entity: stakeholder ack flagged
+      // that the world-anchored centroid label re-projected through
+      // different screen positions per camera angle, breaking the
+      // fixed-UI-card reading. The new `domOverlay` variant pins the
+      // card to the viewer's bottom-right corner via inline absolute
+      // positioning + a responsive `clamp()`-based inset, so it stays
+      // put across top-down, oblique, and near-ground camera framings.
+      // Stays registered so M3's panel can toggle it for screenshot
+      // mode + future per-mode visibility (Phase B's `viewMode`).
+      // No plakietka attribution row — it's a derived view of the
+      // polygon's own ULDK source already credited under granice.
+      // Area + Maks-zabudowa values are still the stakeholder-spec'd
+      // Balice 773 constants; Phase A.5 mass-replication will lift
+      // them through a per-plot data binding alongside the polygon.
       const labelParcel =
         parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
       layerRegistry.add({
@@ -776,21 +777,21 @@ export function Plot3DViewClient({
         name: "Plot info",
         visible: true,
         geometry: {
-          kind: "label",
-          position: [labelCentroidLng, labelCentroidLat],
+          kind: "domOverlay",
           lines: [
-            `Balice ${labelParcel}`,
+            `Balice DZIAŁKA ${labelParcel}`,
             "711 m²",
             "Maks. zabudowa 213 m² · wys. 9 m",
           ],
-          maxVisibleDistanceM: PLOT_INFO_MAX_VISIBLE_DISTANCE_M,
-          pixelOffsetY: PLOT_INFO_PIXEL_OFFSET_Y,
+          anchor: "bottom-right",
         },
-        style: {
-          color: PLOT_INFO_TEXT_COLOR,
-          backdropColor: PLOT_INFO_BACKDROP_COLOR,
-          font: PLOT_INFO_FONT,
-        },
+        // `style.color` is required by the OverlayStyle shape but
+        // unused by the DOM overlay renderer — the Atelier palette
+        // lives inline in `domOverlayRenderer.ts`. Provided for type
+        // compliance; a future iteration that wires per-overlay
+        // tinting through to the renderer can lift this to a real
+        // input.
+        style: { color: "#15171A" },
         source: {
           label: "ULDK GUGiK",
           sourceId: geometry.terytId,

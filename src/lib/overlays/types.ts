@@ -73,12 +73,50 @@ export interface LabelGeometry {
   readonly pixelOffsetY?: number;
 }
 
+/**
+ * Viewer-chrome DOM overlay anchored to a corner of the viewer
+ * container, NOT to a world position. Renderer mounts a styled
+ * `<aside>` element into `viewer.container` and pins it via inline
+ * absolute positioning at the specified corner, so the overlay reads
+ * as fixed UI chrome regardless of camera orientation. Distinct from
+ * `LabelGeometry` (which world-anchors at `[lng, lat]` and accepts a
+ * `DistanceDisplayCondition`) because a screen-anchored overlay has
+ * no meaningful distance window — it's not in the 3D scene. Adding
+ * the discriminated variant avoids the impossible-states API that a
+ * unified "label-or-domOverlay" type would create.
+ *
+ * Use cases (M2.9 and forward): plot info card, owner badge, permit
+ * notice, screenshot watermark — all content that lives IN the
+ * viewer UI but is not anchored to anything in 3D space.
+ *
+ * Multi-line content convention (matches the M2.7 C5 plot info
+ * shape that this variant succeeds):
+ *   - Line 0 → display heading (Fraunces / `--font-display`)
+ *   - Line 1 → numeric metric (JetBrains Mono / `--font-mono`)
+ *   - Line 2+ → body / caption (mono, uppercase tracking)
+ * Future DOM-overlay types with different typographic hierarchies
+ * will likely migrate to a richer per-line type; the flat `lines`
+ * array matches the existing label content shape and keeps the
+ * minimal-MVP `OverlayLayer` surface stable.
+ */
+export interface DomOverlayGeometry {
+  readonly kind: "domOverlay";
+  readonly lines: ReadonlyArray<string>;
+  readonly anchor: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  /**
+   * Maximum inset (px) from the anchored corner at desktop sizes;
+   * narrow viewports tighten via `clamp(12px, 2vw, insetPx)`. Default 24.
+   */
+  readonly insetPx?: number;
+}
+
 export type OverlayGeometry =
   | { readonly kind: "polygon"; readonly boundary: PolygonRing }
   | { readonly kind: "polyline"; readonly path: ReadonlyArray<LngLat> }
   | RasterGeometry
   | TilesetGeometry
-  | LabelGeometry;
+  | LabelGeometry
+  | DomOverlayGeometry;
 
 /**
  * Visualization style. Renderers fall back to sensible defaults when a
