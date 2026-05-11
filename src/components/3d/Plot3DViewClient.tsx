@@ -82,6 +82,26 @@ const VERTICAL_EXAGGERATION = 2.0;
 // if 0.93 still reads jumpy after visual ack, drop the per-notch zoom
 // factor (private `_zoomFactor`) by ~50% as a second-pass mitigation.
 const WHEEL_INERTIA_ZOOM = 0.93;
+// ADR-0006 M2.6 C1 — globe lighting fade distances. Cesium's
+// `Globe.enableLighting` is gated by a distance-based fade so the
+// orbital-globe use case (lighting kicks in when you're far enough
+// back to see the whole planet) doesn't bleed into close-surface
+// views. The default fade window is 6,500 km → 9,000 km from the
+// surface — lighting is OFF below 6,500 km and only fades in past
+// 9,000 km. Our viewer envelope (60 m at plot-scale, ~50 km at
+// Małopolska-scale) lives entirely under the default fade-out
+// distance, so default behaviour would leave the M2.6 hillshade
+// pass with no effect.
+//
+// Setting both ends to zero / one inverts the gate: `lightingFade`
+// in Cesium's shader is `clamp((cameraDistance - fadeOut) /
+// (fadeIn - fadeOut), 0, 1)`. With fadeOut=0 and fadeIn=1 the ratio
+// is `cameraDistance` itself, clamped to 1 — fully lit for any
+// altitude above 1 m. Below 1 m camera-altitudes don't occur in
+// this viewer (boundingSphereRadiusM * 6 gates the initial framing
+// well above that floor).
+const LIGHTING_FADE_OUT_DISTANCE_M = 0;
+const LIGHTING_FADE_IN_DISTANCE_M = 1;
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -216,8 +236,17 @@ export function Plot3DViewClient({
       try {
         // ADR-0006 M2 — Polish NMT 1m quantized-mesh. Cesium probes
         // `${url}/layer.json` then fetches tiles per `available[]`.
+        // M2.6 C1 — `requestVertexNormals: true` opts the provider into
+        // the per-vertex oct-encoded normals baked by `ctb-tile -N`.
+        // Negotiation succeeds because the layer.json self-heal step in
+        // `scripts/build-terrain-tiles.mjs` (M2.6 C0.5) declares
+        // `extensions: ["octvertexnormals"]`; without that advertisement
+        // Cesium silently falls back to flat shading even when this
+        // option is set. The ION fallback below stays optionless because
+        // ION's World Terrain advertises normals on its own manifest.
         terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
           nmtTilesetUrl,
+          { requestVertexNormals: true },
         );
       } catch (nmtErr) {
         console.warn(
@@ -292,6 +321,17 @@ export function Plot3DViewClient({
       v.scene.globe.show = true;
       // M2.5-A — visual relief boost; see VERTICAL_EXAGGERATION rationale.
       v.scene.verticalExaggeration = VERTICAL_EXAGGERATION;
+      // M2.6 C1 — globe lighting. Requires per-vertex normals on the
+      // terrain provider (see M2.6 C0.5 layer.json self-heal +
+      // `requestVertexNormals: true` above). Default Cesium fade window
+      // hides lighting at our plot-scale altitudes; the
+      // LIGHTING_FADE_*_DISTANCE constants invert the gate so lighting
+      // is fully on across the entire viewer envelope (~60 m to ~50 km).
+      // Without this stanza the NW rake-light from C2 has no surface
+      // normals to shade against and the relief reads flat.
+      v.scene.globe.enableLighting = true;
+      v.scene.globe.lightingFadeOutDistance = LIGHTING_FADE_OUT_DISTANCE_M;
+      v.scene.globe.lightingFadeInDistance = LIGHTING_FADE_IN_DISTANCE_M;
       // M2.5-D — viewer launches inert so wheel events pass through to
       // page scroll. The click-to-interact overlay flips `isActive`,
       // which a sibling useEffect mirrors onto enableInputs. Reading
