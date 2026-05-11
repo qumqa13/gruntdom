@@ -120,7 +120,7 @@ function FullscreenToggleButton({
       onClick={onToggle}
       aria-label={label}
       title={label}
-      className={`${positionClass} flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft`}
+      className={`${positionClass} flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card outline-none transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft focus-visible:ring-2 focus-visible:ring-clay/60`}
     >
       {isFullscreen ? <CollapseGlyph /> : <ExpandGlyph />}
     </button>

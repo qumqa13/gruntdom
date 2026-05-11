@@ -568,7 +568,7 @@ export function Plot3DViewClient({
       <button
         type="button"
         onClick={() => resetCameraRef.current?.()}
-        className="absolute bottom-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft"
+        className="absolute bottom-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card outline-none transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft focus-visible:ring-2 focus-visible:ring-clay/60"
         aria-label="Wycentruj widok na działkę"
         title="Wycentruj widok"
       >
@@ -578,7 +578,7 @@ export function Plot3DViewClient({
         <button
           type="button"
           onClick={() => setIsActive(true)}
-          className="absolute inset-0 flex cursor-pointer touch-pan-y items-center justify-center bg-paper/30 transition-colors duration-200 hover:bg-paper/20"
+          className="absolute inset-0 z-[15] flex cursor-pointer touch-pan-y items-center justify-center bg-paper/30 transition-colors duration-200 hover:bg-paper/20"
           aria-label={
             isCoarsePointer
               ? "Dotknij, aby aktywować sterowanie widokiem 3D"
