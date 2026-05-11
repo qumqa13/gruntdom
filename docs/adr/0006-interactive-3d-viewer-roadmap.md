@@ -99,6 +99,15 @@ Geoportal Polski is the authoritative source for all terrain, imagery, and thema
 **Provenance added:** `Geoportal ORTO · StandardResolution · PZGiK`
 **Gate:** Visual ack — vehicles, trees, individual buildings readable under all 4 plots
 
+**✅ Completed 2026-05-11 — landed on Balice 773 via three atomic commits on `main`:**
+- `5b09424` feat(geoportal): add ORTO_STANDARD layer to WMS proxy (lib + tests, 110 → 111)
+- `ad20dc8` feat(3d): swap Bing imagery to Geoportal ORTO StandardResolution (route handler + viewer probe + provenance)
+- this commit — completion note
+
+Per v3 depth-first scope: imagery swap shipped on plot-04 (Balice 773) only; plots 01–03 remain on default ION imagery until Phase A.5 mass-replication. Visual ack 2026-05-11: dachy sąsiadów, droga, struktura zarośnięcia działki readable at 25–50 cm/piksel.
+
+**Observed under load (non-blocking, parked for M16 perf hardening):** intermittent `502 Bad Gateway` from the `/api/geoportal/wms?layer=ORTO_STANDARD` proxy when Geoportal upstream momentarily 5xxs. Hot path stays smooth because most tiles serve from browser cache after first cold load. Candidate tunings (defer until M16): widen the per-layer rate-limit override to 1 req/3 s, add a bounded retry-with-backoff inside the route handler, and consider surfacing a transient-error counter in `getWmsMetrics()`.
+
 ### M2 — Terrain swap: Cesium World Terrain → Polish NMT GRID1 1m
 
 **Scope:** Replace `CesiumTerrainProvider.fromIonAssetId(1)` with custom terrain pipeline. Two options:
