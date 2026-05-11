@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "validate:images": "node scripts/validate-plot-images.mjs",
     "build-terrain": "node scripts/build-terrain-tiles.mjs",
+    "build-terrain:contour": "node scripts/build-contour-tiles.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
