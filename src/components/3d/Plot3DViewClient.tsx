@@ -25,7 +25,7 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
 import { plotLayerIdForTerytId } from "@/lib/overlays/plotLayerId";
-import { renderPolygonOverlay } from "@/lib/overlays/renderers/polygonRenderer";
+import { renderOverlay } from "@/lib/overlays/renderOverlay";
 import type { OverlayDisposer } from "@/lib/overlays/types";
 import { getTerrainStorage } from "@/lib/terrain/storage";
 
@@ -472,11 +472,14 @@ export function Plot3DViewClient({
         },
       });
 
+      // M2.7 — dispatch by `layer.geometry.kind` rather than calling
+      // `renderPolygonOverlay` directly. The dispatcher handles polygon
+      // (M2.5-B), raster (M2.7 streets + parked-hillshade), tileset
+      // (M2.7 buildings via ION 96188), and label (M2.7 plot info).
+      // Future renderer additions plug into the dispatcher rather than
+      // here; this loop stays unchanged as the registry grows.
       for (const layer of layerRegistry.getVisible()) {
-        const dispose = renderPolygonOverlay(layer, {
-          Cesium,
-          viewer: v,
-        });
+        const dispose = renderOverlay(layer, { Cesium, viewer: v });
         overlayDisposers.push(dispose);
       }
 
