@@ -228,16 +228,63 @@ Tuning headroom captured for a future iteration: if a later visual ack reads "st
 
 Test suite at M2.5-E close: 137/137 (one new vitest path resolved under the activation/loading state machine; tsc + lint clean).
 
-#### Parked for M2.6 / M2.7 / M3 / M16 (carry-forward post-M2.5-E)
+### M2.6 — Terrain depth pass (relief signaling)
 
-- **M2.6 terrain depth pass** — stakeholder feedback after M2.5-E ack: "płaska tekstura, brak zróżnicowania terenu". Even with ×2 exaggeration the Balice mosaic reads cartographically thin because the GRID1 1 m source data has no shading cues — flat orthorectified imagery draped on a relatively smooth mesh. M2.6 pivots back to the original cartographic-polish path with three layered mitigations:
-  - **Per-vertex normals** — pass `requestVertexNormals: true` to `CesiumTerrainProvider.fromUrl`, enabling Cesium's built-in lambert shading. Requires re-bake — ctb-tile must emit normals into the quantized-mesh tiles; the existing `npm run build-terrain` cache short-circuits steps 1-3 but step 4 (ctb-tile) re-runs with the new flag.
-  - **Hillshade overlay** — semi-transparent GUGiK or computed hillshade layer above ortofoto. WMS source TBD; if Geoportal doesn't publish a usable hillshade, derive locally from the same NMT GRID1 data at bake time and serve from R2 alongside the terrain tileset.
-  - **Sun lighting** — `scene.globe.enableLighting = true` with a stable noon-position sun. Atmosphere and dynamic time-of-day stay deferred to Phase A M6 (sun position & shadows) — M2.6 wants the readability mitigation, not the analysis primitive.
-  - Supersedes the M2.5-B "per-vertex normals + hillshade overlay" parked item — that line item gets the formal M2.6 scope here.
-  - **Time:** 4-6 h (re-bake required for vertex normals; hillshade source investigation gates the start).
-- **M2.7 contextual layers** — first move toward thematic overlay UX before the full M3 panel. Likely scope: a single MPZP-or-equivalent toggle wired through the LayerRegistry to validate the disposer-symmetric renderer contract under a non-cadastral data source. Defines whether the renderer abstraction generalises before M3 builds UI on top of it. Detailed scope decided at M2.6 ack.
-- **M3 layer control panel UI** — still parked; queues after M2.6 + M2.7. Foundation already shipped in M2.5-B (`LayerRegistry` + `OverlayLayer` types + polygon renderer + `subscribe` channel).
+**✅ Completed 2026-05-11 late evening on Balice 773** — stakeholder visual ack passed after three coordinated commits closed a manifest-lies regression that had been masking the entire NMT bake's relief data since M2.
+
+Three commits on `main`:
+- `7fbe102` chore(terrain): self-heal layer.json — advertise octvertexnormals (C0.5)
+- `86b9708` feat(3d): per-vertex normals + globe lighting — relief signaling (C1)
+- `b876ffd` feat(3d): cartographic rake light — NW azimuth 315°, altitude 30° (C2)
+
+#### Root cause — manifest lies
+
+The M2 bake pipeline has used `ctb-tile -N` from day one — every `.terrain` binary in `public/terrain-tiles/balice/` carries oct-encoded per-vertex normals (2 extra octahedron-encoded bytes per vertex, appended after the standard quantized-mesh vertex data). The `ctb-tile -l` step that generates layer.json, however, does NOT advertise that extension in the manifest. `CesiumTerrainProvider` performs an extension negotiation against the served layer.json on load — the server doesn't claim normals, so the provider never requests them, and the data sits unread in every tile. The result: `scene.globe.enableLighting` cannot drive shading because Cesium has no surface normals exposed in the runtime mesh, even though the binary data is sitting right there. Stakeholder feedback after M2.5-E ack ("płaska tekstura, brak zróżnicowania terenu") is downstream of this — the bake was producing the right data, the manifest was lying about it.
+
+#### C0.5 — Layer.json self-heal
+
+`scripts/build-terrain-tiles.mjs` gains a new idempotent post-process step (5c, `injectVertexNormalsExtension`), called after `trimLayerJsonAvailable` (5b). Reads layer.json, appends `"octvertexnormals"` to the `extensions[]` array if missing, preserves any other declared extensions (future `"watermask"` or `"metadata"`). Future bakes self-heal. The current `public/terrain-tiles/balice/layer.json` (gitignored under ADR-0002's "baked artifacts not in repo" rule) was hand-patched once in the same change to converge immediately — no re-bake needed because the tile binaries already carry the data.
+
+#### C1 — Provider + globe lighting
+
+Three coordinated wiring changes:
+
+- `CesiumTerrainProvider.fromUrl(url, { requestVertexNormals: true })` opts the provider into the normals negotiation. Succeeds only because of C0.5 — without the manifest fix this option silently degrades to flat shading.
+- `scene.globe.enableLighting = true` activates Cesium's built-in lambert pass.
+- Fade-distance gate inverted: Cesium's default lighting fade window (6,500 km → 9,000 km from surface) is tuned for orbital-globe views — lighting is OFF below 6,500 km and only fades in past 9,000 km. Our viewer envelope sits entirely under 6,500 km, so default behaviour would leave lighting OFF for the entire user experience. New constants `LIGHTING_FADE_OUT_DISTANCE_M = 0` and `LIGHTING_FADE_IN_DISTANCE_M = 1` collapse the fade window below any plausible camera altitude. Cesium's shader expression `clamp((cameraDistance - fadeOut) / (fadeIn - fadeOut), 0, 1)` evaluates to 1 across the entire viewer envelope (~60 m at plot-scale through ~50 km at Małopolska-scale).
+
+Constants live near `VERTICAL_EXAGGERATION` + `WHEEL_INERTIA_ZOOM` so the controller/lighting tuning knobs share a single "viewer interaction + visual defaults" stanza rather than scattering through the mount IIFE.
+
+#### C2 — Cartographic rake light
+
+Default Cesium light is a real-time sun tracking current UTC. That gives lighting, but the relief direction drifts through the day: at 10:00 the SW slopes are lit and the NE in shadow; at 14:00 it's reversed; at midnight there's no usable light. For a plot listing the buyer can load at any moment, the read "this side is steeper than that one" can't depend on the page-load timestamp.
+
+`scene.light = new Cesium.DirectionalLight({ direction })` replaces the real-time sun with a fixed NW rake light: azimuth 315° clockwise from north, altitude 30° above horizon. NW-from-above is the perceptual upper-left light Western map-readers parse as "raised" (flipping to SE inverts the relief and reads as carved-in); 30° altitude gives shadows long enough to cue micro-relief without crushing low slopes. Same low-angle NW rake every paper-map hillshade has used since the 19th century.
+
+Direction math: source bearing built in the plot's local East-North-Up frame (`sin(az)·cos(alt) E + cos(az)·cos(alt) N + sin(alt) U`), lifted to ECEF via `Transforms.eastNorthUpToFixedFrame` + `Matrix4.multiplyByPointAsVector` (rotation-only — drops translation), negated + normalised because `DirectionalLight.direction` is the world-space vector the light TRAVELS, opposite of source bearing. ENU basis recomputed per mount because it depends on lat/lng; a fixed ECEF vector would point in different local directions for different plots and break the editorial "NW rake" promise across Phase A.5's mass-replication.
+
+Phase A M6 (sun position & shadows analysis) will override `scene.light` with a real-time sun + time-of-day slider when the shadow-analysis primitive lands. Until M6, the fixed rake is M2.6's editorial default.
+
+#### Visual ack — 2026-05-11 late evening
+
+Stakeholder confirmed: sun bloom visible in upper-right corner of the scene, directional shading on hills (NE lit, SW in shadow), polygon Balice 773 outline unobscured by the new shading. ×2 exaggeration (M2.5-A invariant) preserved. No FPS regression vs M2.5-E baseline.
+
+#### C3 (hillshade overlay) — SKIPPED, parked
+
+Gate 1 carved C3 as conditional on C1+C2 visual reading flat. C1+C2 alone cleared the bar, so the C3 hillshade overlay never landed in this milestone. Parked under M2.7 (below) because it'd ride on the same OverlayGeometry-union extension that M2.7's layer separation pack needs. If a future visual ack flags shading too subtle (or post-Phase-A.5 mass-replication exposes plots where the rake doesn't compose well with local relief), the C3 hillshade scope is documented for revival without re-deriving the trade-off.
+
+Test suite at M2.6 close: 137/137 (no new tests this bundle — the relief work is per-vertex shader behaviour, exercised by visual ack rather than offline assertions). tsc + lint clean.
+
+#### Parked for M2.7 / M3 / M16 (carry-forward post-M2.6)
+
+- **M2.7 layer separation pack** — stakeholder feedback after M2.6 ack: "działka osobno, ulica osobno, budynki osobno, itp itd". The single-overlay-on-terrain pattern shipped in M2.5-B doesn't yet match the contextual-layers UX the buyer / agent / developer audiences need. M2.7 scope: three new overlay layer instances stretching the LayerRegistry foundation:
+  - **3D buildings** — Cesium 3D Tiles or extruded OpenStreetMap building footprints, gated behind a "Budynki" toggle. ION-hosted OSM Buildings tileset is the MVP source; the M9 Phase B work upgrades to extruded MPZP envelopes for the subject + neighbours.
+  - **Streets reference** — OpenStreetMap roads, either as a vector tile layer or as a raster overlay above the ortofoto. Gated behind a "Ulice" toggle. The plakietka caption row gains a third entry.
+  - **Plot info overlay** — labels + dimensions / area / parcel number rendered as a HUD-style overlay anchored to the plot polygon. Atelier typographic style (Fraunces / Instrument Sans / JetBrains Mono).
+  - **OverlayGeometry union extension** — current discriminated union is `polygon | polyline`; M2.7 adds `raster | tileset | label` kinds plus matching renderers in `src/lib/overlays/renderers/`. Exhaustive-check the 5 existing call-sites that switch on `kind`. Tests grow with each new renderer.
+  - **Hillshade overlay (formerly M2.6 C3)** — parked here because it'd ride the same `raster` union extension. Revive only if a future visual ack flags shading too subtle.
+  - **Time:** 5-8 h. Bottleneck is the OverlayGeometry union extension + tests; once raster/tileset kinds land the three layer instances are roughly equal effort.
+- **M3 layer control panel UI** — still parked; queues after M2.7. Foundation already shipped in M2.5-B (`LayerRegistry` + `OverlayLayer` types + polygon renderer + `subscribe` channel). M3 binds the toggle UX to the registry's subscribe channel and surfaces the 4-5 visible overlays from M2.5-B + M2.7. Phase B's `viewMode` plumbing rides on the same panel — internal "buyer / investor / developer" toggle becomes user-visible.
 - **Mobile fallback to 2D** — Cesium battery cost on phones; M16 toggles a "Map 2D" downgrade. Still parked.
 - **`layer.json` `bounds` post-process** — still defaults to the eastern-hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent. Efficiency hint only; content geometry is correct via `available[]`. Still parked under M16.
 
