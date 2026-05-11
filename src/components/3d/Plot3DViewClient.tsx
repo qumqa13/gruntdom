@@ -212,6 +212,21 @@ const STAMEN_STREETS_URL =
   "https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}.png";
 const STAMEN_STREETS_MAX_LEVEL = 18;
 const STAMEN_STREETS_OPACITY = 0.65;
+// ADR-0006 M2.9 Bucket #2 polish — Stamen Toner Labels companion
+// to Toner Lines above. Adds street name + place name text on top
+// of the linework so the "where am I in Balice" anchor function
+// includes named navigation, not just geometric road shapes. Same
+// Stadia Maps free dev tier as the lines layer; `{r}` retina
+// suffix dropped (Cesium UrlTemplateImageryProvider can't
+// substitute it). Layer α 0.85 — labels need prominence above the
+// imagery stack to read at editorial font sizes; lower opacity
+// renders them as faint ghost text. Tops out at z18 sync'd with
+// the lines layer so the two halves of the streets reference move
+// together as the camera zooms.
+const STAMEN_LABELS_URL =
+  "https://tiles.stadiamaps.com/tiles/stamen_toner_labels/{z}/{x}/{y}.png";
+const STAMEN_LABELS_MAX_LEVEL = 18;
+const STAMEN_LABELS_OPACITY = 0.85;
 // ADR-0006 M2.8 C3 — contour-line overlay derived from the NMT
 // GRID1 1 m mosaic (the same bake M2 produces and M2.6 self-heals
 // with octvertexnormals). Pre-baked PNG pyramid; the tile pipeline
@@ -714,6 +729,29 @@ export function Plot3DViewClient({
         source: { label: "Stamen Toner Lines", sourceId: "OSM" },
       });
 
+      // M2.9 Bucket #2 polish — Stamen Toner Labels companion to the
+      // Toner Lines layer above. Registered AFTER streets-balice so
+      // the imagery stack reads, bottom-up: ORTO → slope wash →
+      // contour hairlines → streets lines → streets labels. The
+      // polygon entity + plot info DOM overlay sit above all
+      // imagery regardless. Independent layer (not folded into the
+      // lines layer) so M3's layer panel can toggle linework and
+      // labels independently — useful for screenshot framing where
+      // text might clutter, or for the inverse case where only names
+      // are wanted as a sketch.
+      layerRegistry.add({
+        id: "streets-labels-balice-773",
+        name: "Nazwy ulic",
+        visible: true,
+        geometry: {
+          kind: "raster",
+          urlTemplate: STAMEN_LABELS_URL,
+          maximumLevel: STAMEN_LABELS_MAX_LEVEL,
+        },
+        style: { color: "#000000", opacity: STAMEN_LABELS_OPACITY },
+        source: { label: "Stamen Toner Labels", sourceId: "OSM" },
+      });
+
       // M2.7 C5 — plot info label anchored at the polygon centroid.
       // Three-line callout (parcel + area + Maks-zabudowa) auto-hides
       // past 2 km via DistanceDisplayCondition so the pill doesn't
@@ -1044,17 +1082,17 @@ export function Plot3DViewClient({
           </div>
         </div>
       )}
-      {/* M2.7 C6 + C9 → M2.8 C5 — registry-bound layer count indicator.
-          Replaces the M2.5-B hardcoded "1 nakładka aktywna" span that
-          lived in page.tsx; the count now derives from
-          LayerRegistry.subscribe (5 active after M2.8: polygon + slope
-          + contour + streets + plot info label). pluralizeNakladka(5)
-          returns the genitive-plural form so the pill reads "5 nakładek
-          aktywnych" — the carve-out logic already supports 5+ per the
-          M2.7 C6 helper, no grammar patch needed. Pointer-events-none
-          so the pill never intercepts Cesium drag input. Positioned
-          top-LEFT to avoid colliding with the fullscreen toggle at
-          top-right. */}
+      {/* M2.7 C6 + C9 → M2.8 C5 → M2.9 — registry-bound layer count
+          indicator. Replaces the M2.5-B hardcoded "1 nakładka aktywna"
+          span that lived in page.tsx; the count now derives from
+          LayerRegistry.subscribe (6 active after M2.9: polygon + slope
+          + contour + streets lines + streets labels + plot info).
+          pluralizeNakladka(6) returns the genitive-plural form so the
+          pill reads "6 nakładek aktywnych" — same carve-out branch as
+          n=5 (lastDigit 6 falls outside the 2-4 "few" form band), no
+          grammar patch needed. Pointer-events-none so the pill never
+          intercepts Cesium drag input. Positioned top-LEFT to avoid
+          colliding with the fullscreen toggle at top-right. */}
       {visibleOverlayCount > 0 && (
         <span
           className="pointer-events-none absolute left-3 top-3 z-10 rounded-xs border border-line/40 bg-paper/85 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint"
