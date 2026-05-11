@@ -131,6 +131,12 @@ export function Plot3DViewClient({
   const cesiumMountRef = useRef<HTMLDivElement | null>(null);
   const viewerHandleRef = useRef<ViewerActivationHandle | null>(null);
   const isActiveRef = useRef(false);
+  // M2.5-D C4 — closure-bound camera-reset callback. The mount IIFE
+  // captures `cameraGroundHeight` (a per-mount sampled value) and
+  // wires up a `flyTo(defaults)` thunk so the bottom-left reset button
+  // can re-trigger the initial framing without re-running the mount
+  // effect.
+  const resetCameraRef = useRef<(() => void) | null>(null);
   const [isActive, setIsActive] = useState(false);
   // M2.5-D C3 — `(pointer: coarse)` matches touchscreens / styluses;
   // separates touch UX (large "Dotknij, aby aktywować" tap target,
@@ -138,6 +144,11 @@ export function Plot3DViewClient({
   // the desktop mouse path. Hybrid devices with a fine pointer fall
   // through to the desktop branch.
   const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+  // M2.5-D C4 — loading state machine. `isLoading` controls whether
+  // the paper-skeleton overlay is in the tree; `isLoadingFading`
+  // toggles the 300 ms opacity fade just before unmount.
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFading, setIsLoadingFading] = useState(false);
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -154,9 +165,17 @@ export function Plot3DViewClient({
 
   useEffect(() => {
     if (!cesiumMountRef.current) return;
+    // M2.5-D C4 — reset the loading flags on every re-run so route
+    // navigation between plot detail pages (which changes
+    // geometry.terytId, the effect dep) re-shows the skeleton until
+    // the new mosaic settles.
+    setIsLoading(true);
+    setIsLoadingFading(false);
     let disposed = false;
     let viewer: { destroy: () => void } | null = null;
     let flyTimer: ReturnType<typeof setTimeout> | null = null;
+    let loadingFadeTimer: ReturnType<typeof setTimeout> | null = null;
+    let detachRender: (() => void) | null = null;
     const overlayDisposers: OverlayDisposer[] = [];
 
     (async () => {
@@ -265,6 +284,37 @@ export function Plot3DViewClient({
       // by the time we reach this line, isActiveRef already reflects
       // the user's intent and Cesium boots armed.
       v.scene.screenSpaceCameraController.enableInputs = isActiveRef.current;
+
+      // M2.5-D C4 — loading-state machine. The paper skeleton overlay
+      // stays in the tree until BOTH (a) at least 1500 ms have passed
+      // (avoids flicker on fast paths) AND (b) terrain tiles have
+      // loaded OR Cesium has produced ≥ 30 rendered frames (covers
+      // the case where the tile pyramid never reports fully-loaded
+      // due to dynamic streaming). Once the gate releases we fade the
+      // overlay over 300 ms and then unmount it. The disposer in this
+      // effect's cleanup detaches the listener and clears the fade
+      // timer so a route-navigation mid-load can't leak callbacks or
+      // call setState on an unmounted component.
+      const loadingStart = performance.now();
+      let renderedFrames = 0;
+      const onPostRender = () => {
+        if (disposed) return;
+        renderedFrames += 1;
+        const elapsed = performance.now() - loadingStart;
+        if (elapsed < 1500) return;
+        const tilesReady = v.scene.globe.tilesLoaded;
+        if (!tilesReady && renderedFrames < 30) return;
+        if (detachRender) {
+          detachRender();
+          detachRender = null;
+        }
+        setIsLoadingFading(true);
+        loadingFadeTimer = setTimeout(() => {
+          if (disposed) return;
+          setIsLoading(false);
+        }, 300);
+      };
+      detachRender = v.scene.postRender.addEventListener(onPostRender);
 
       // ringForSampling — open ring (no closing duplicate) consumed by
       // the camera-height sampling block below. The overlay renderer
@@ -375,12 +425,42 @@ export function Plot3DViewClient({
           duration: CAMERA_FLY_DURATION_S,
           easingFunction: Cesium.EasingFunction.QUARTIC_OUT,
         });
+
+        // M2.5-D C4 — bind the reset thunk now that we have the
+        // resolved flyAlt + offsetLat. Recompute the destination on
+        // each invocation (Cesium.Cartesian3 is freshly allocated, and
+        // it leaves headroom if a future per-call exaggeration tweak
+        // wants to shift the framing). Reset uses QUADRATIC_OUT per
+        // user-spec — slightly softer than the initial QUARTIC_OUT
+        // approach, reads as "settling back" rather than "arriving".
+        resetCameraRef.current = () => {
+          if (disposed) return;
+          v.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(
+              cLng,
+              cLat + offsetLat,
+              flyAlt,
+            ),
+            orientation: {
+              heading: Cesium.Math.toRadians(frontAzimuthDeg),
+              pitch: Cesium.Math.toRadians(-45),
+              roll: 0,
+            },
+            duration: CAMERA_FLY_DURATION_S,
+            easingFunction: Cesium.EasingFunction.QUADRATIC_OUT,
+          });
+        };
       }, CAMERA_FLY_DELAY_MS);
     })();
 
     return () => {
       disposed = true;
       if (flyTimer) clearTimeout(flyTimer);
+      if (loadingFadeTimer) clearTimeout(loadingFadeTimer);
+      if (detachRender) {
+        detachRender();
+        detachRender = null;
+      }
       // Explicit overlay teardown before viewer.destroy(): `destroy()`
       // wipes the entity collection anyway, but running disposers first
       // keeps renderer ownership symmetric (each render registers a
@@ -390,6 +470,7 @@ export function Plot3DViewClient({
       overlayDisposers.length = 0;
       if (viewer) viewer.destroy();
       viewerHandleRef.current = null;
+      resetCameraRef.current = null;
     };
     // Geometry is plot-scoped; route navigation unmounts the viewer, so a
     // stable terytId is sufficient as the re-init key.
@@ -457,6 +538,42 @@ export function Plot3DViewClient({
         className={`absolute inset-0 ${isActive ? "touch-none" : ""}`}
         data-testid="plot3d-cesium-container"
       />
+      {/* M2.5-D C4 — loading overlay. Sits at z-[20] above the
+          click-to-interact gate (z-[15]) so a user can't accidentally
+          activate the viewer while tiles are still streaming. The
+          1px clay border on an inset div picks up Tailwind's
+          animate-pulse opacity wave (0.5 ↔ 1) — the user-spec's
+          0.3 ↔ 0.7 envelope is the iteration target for the visual
+          ack if the default reads too prominent. */}
+      {isLoading && (
+        <div
+          className={`pointer-events-none absolute inset-0 z-[20] bg-paper transition-opacity duration-300 ${
+            isLoadingFading ? "opacity-0" : "opacity-100"
+          }`}
+          aria-hidden
+          data-testid="plot3d-loading-overlay"
+        >
+          <div className="absolute inset-3 animate-pulse border border-clay opacity-60" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono text-[11px] italic uppercase tracking-[0.18em] text-ink-faint">
+              Wczytywanie terenu…
+            </span>
+          </div>
+        </div>
+      )}
+      {/* M2.5-D C4 — recenter button bottom-left. Re-runs the initial
+          flyTo via the closure-bound thunk in resetCameraRef. Visible
+          regardless of activation state so the user can re-frame the
+          plot without first activating the camera. */}
+      <button
+        type="button"
+        onClick={() => resetCameraRef.current?.()}
+        className="absolute bottom-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card transition-colors duration-200 hover:bg-paper-soft hover:text-ink-soft"
+        aria-label="Wycentruj widok na działkę"
+        title="Wycentruj widok"
+      >
+        <ReticleGlyph />
+      </button>
       {!isActive && (
         <button
           type="button"
@@ -484,5 +601,33 @@ export function Plot3DViewClient({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Target-reticle glyph for the recenter button. Editorial geometry:
+ * a centred circle with four short tick marks pointing inward, square
+ * line joins, no rounded caps. Uses `currentColor` so the parent text
+ * colour drives ink contrast.
+ */
+function ReticleGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinecap="square"
+      strokeLinejoin="miter"
+      aria-hidden
+    >
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1V3.5" />
+      <path d="M8 12.5V15" />
+      <path d="M1 8H3.5" />
+      <path d="M12.5 8H15" />
+    </svg>
   );
 }
