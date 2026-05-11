@@ -237,6 +237,16 @@ export function LayerPanel({ registry }: LayerPanelProps) {
  * used in the plakietka status marker at page.tsx line 500 and the
  * viewer's existing typographic vocabulary — no new icon family
  * introduced.
+ *
+ * Locked variant (M3 C3 — `layer.locked === true`): renders as a
+ * `<div>` (not button), shows an em-dash glyph in `clay/50` instead
+ * of `●`/`○`, surfaces an italic "zawsze widoczne" disclosure under
+ * the layer name, and carries `aria-disabled` + `tabIndex=-1` so
+ * keyboard nav skips the row. The em-dash glyph closes the dot
+ * vocabulary (●/○) with a third quiet member that reads as "fixed
+ * / line drawn through" rather than a third interactive state —
+ * deliberately NOT a 🔒 emoji (forbidden by the no-fallback
+ * constraints) and NOT a new icon family.
  */
 function LayerRow({
   layer,
@@ -245,6 +255,31 @@ function LayerRow({
   layer: OverlayLayer;
   onToggle: () => void;
 }) {
+  if (layer.locked) {
+    return (
+      <div
+        className="flex w-full items-center justify-between rounded-xs py-1.5 pl-1 pr-2"
+        aria-disabled
+        tabIndex={-1}
+        data-testid={`layer-panel-row-${layer.id}`}
+        data-locked="true"
+      >
+        <span className="flex flex-col">
+          <span className="text-[13px] text-ink-body">{layer.name}</span>
+          <span className="mt-0.5 font-mono text-[10px] italic tracking-[0.04em] text-ink-faint">
+            zawsze widoczne
+          </span>
+        </span>
+        <span
+          className="font-mono text-[11px] text-clay/50"
+          aria-hidden
+          data-testid={`layer-panel-row-glyph-${layer.id}`}
+        >
+          —
+        </span>
+      </div>
+    );
+  }
   const stateHint = layer.visible ? "widoczne" : "ukryte";
   return (
     <button

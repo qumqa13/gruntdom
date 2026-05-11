@@ -669,8 +669,22 @@ export function Plot3DViewClient({
 
       layerRegistry.add({
         id: plotLayerIdForTerytId(geometry.terytId),
-        name: parcelLabel ?? geometry.parcelNumber ?? "działka",
+        // M3 C3 — UI-side editorial label. The previous fallback
+        // chain (`parcelLabel ?? parcelNumber ?? "działka"`) had a
+        // single goal: avoid empty text in the M2.5-B inline span.
+        // Now that LayerPanel renders this name as a row label
+        // alongside other Polish strings ("Ulice", "Nazwy ulic",
+        // etc.), "Granice działki" reads as a clean editorial peer
+        // — describes WHAT the layer is, not WHICH parcel. The
+        // specific parcel identity is already carried by the plot
+        // info card heading ("Balice DZIAŁKA 773") and the
+        // plakietka attribution row.
+        name: "Granice działki",
         visible: true,
+        // M3 C3 — locked / always-on. The polygon is the page's
+        // foreground subject; LayerPanel renders it as a non-
+        // toggleable row with a "zawsze widoczne" disclosure.
+        locked: true,
         geometry: { kind: "polygon", boundary: geometry.boundary },
         style: {
           color: CLAY_HEX,
@@ -804,7 +818,16 @@ export function Plot3DViewClient({
         parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
       layerRegistry.add({
         id: "plot-info-balice-773",
-        name: "Plot info",
+        // M3 C3 — Polish editorial rename. The English placeholder
+        // "Plot info" worked for the M2.7 C5 LabelGraphics variant
+        // because it never appeared in user-facing text (the
+        // LabelGraphics rendered its multi-line content directly).
+        // Now that LayerPanel surfaces the layer's `name` as a row
+        // label alongside Polish peers ("Granice działki", "Ulice",
+        // "Poziomice"), the English name reads as a translation
+        // gap. "Karta działki" reads as the editorial peer the
+        // brief calls out.
+        name: "Karta działki",
         visible: true,
         geometry: {
           kind: "domOverlay",

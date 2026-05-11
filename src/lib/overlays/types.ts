@@ -185,6 +185,23 @@ export interface OverlayLayer {
   readonly style: OverlayStyle;
   /** Provenance metadata for the plakietka. */
   readonly source: LayerSource;
+  /**
+   * M3 C3 — when true, the layer panel renders this row as a
+   * locked / always-on entry: no toggle affordance, a quiet line
+   * glyph instead of `●` / `○`, an italic disclosure ("zawsze
+   * widoczne") under the name, and `aria-disabled` + `tabIndex=-1`
+   * so the row is skipped by keyboard nav. Hint only — the registry
+   * itself does not enforce immutability of `visible` (a future
+   * non-panel client could still call `setVisible`); the lock is
+   * the LayerPanel's contract that THIS layer is the page's
+   * foreground subject and should not be hideable through the UI.
+   *
+   * Used in M3 C3 to mark the plot polygon (`granice działki`) as
+   * always-on. Phase B M10 neighbour-plot envelopes will decide
+   * their own lock state independently — the field is a per-layer
+   * declarative hint, not an inferred-from-kind property.
+   */
+  readonly locked?: boolean;
 }
 
 /** Returned by renderers; call to remove the rendered entities. */
