@@ -318,6 +318,66 @@ Probed whether GRID0.5 (50 cm horizontal spacing) was available for Balice as a 
 
 - Probe artefacts under `.cache/wfs-probe/` (gitignored).
 
+### M2.7 — Layer separation pack (partial: streets + plot info; buildings rolled back)
+
+**✅ Completed 2026-05-11 late night on Balice 773** — partial close. Six implementation commits + a two-commit buildings rollback bundle landed three visible overlays in production (polygon + streets + plot info label) and parked the buildings overlay after the visual-ack pass surfaced an alignment / editorial-style mismatch. Stakeholder visual ack on the partial set passed; the hillshade overlay (M2.6 C3 carry-forward) is reabsorbed into M2.8 below.
+
+Eight commits on `main`:
+- `4a7c5a3` feat(overlays): OverlayGeometry union — raster + tileset + label kinds (C1)
+- `44b4068` feat(overlays): raster + tileset + label renderers + dispatcher (C2)
+- `43558be` feat(overlays): 3D buildings via Cesium OSM Buildings (ION 96188) (C3 — rolled back in C8)
+- `6aeb6ca` feat(overlays): streets reference layer — CartoDB Voyager (C4)
+- `395103a` feat(overlays): plot info label at polygon centroid (C5)
+- `c80085d` feat(3d): dynamic overlay-count indicator + expanded plakietka rows (C6)
+- `8c798f1` revert(overlays): drop 3D buildings layer (C8)
+- `8c97f82` refactor(3d): update indicator + plakietka — 3 nakładki aktywne (C9)
+
+#### C1 / C2 — Union extension + dispatcher
+
+`OverlayGeometry` discriminated union grows from `polygon | polyline` to `polygon | polyline | raster | tileset | label`. New optional `OverlayStyle` fields (`opacity` for raster, `backdropColor` + `font` for label) ride alongside the existing polygon set. `renderOverlay.ts` switches on `geometry.kind`, calls the per-kind renderer, returns an `OverlayDisposer`; the `never`-assigned default branch catches future union extensions at build time. The `Plot3DViewClient.tsx` mount IIFE replaces the direct `renderPolygonOverlay` call with `renderOverlay(layer, deps)` so the dispatcher is the single integration point for any future renderer. `renderTilesetOverlay` lands the async-load sync-disposer pattern that any future async-resolved overlay should mirror: a captured `disposed` flag + tileset ref handle three race outcomes (load-then-add, disposed-after-add → remove cleanly, disposed-before-load → `destroy()` on eventual resolution so the tileset never reaches the scene graph). Raster + tileset renderers also catch load errors as `console.warn` without throwing — single unavailable ION asset or CORS-blocked CDN doesn't break the rest of the viewer. Matches the M1 Geoportal probe / Bing fallback posture.
+
+#### C4 — Streets reference (CartoDB Voyager)
+
+`voyager_only_labels` style (`https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png`) strips the basemap fill and keeps only the road network + place labels in CartoDB's editorial palette. Composited above Geoportal ORTO at 0.55 opacity through the `raster` renderer (Cesium `UrlTemplateImageryProvider` under the hood). Free for non-commercial use under CartoDB's terms; attribution surfaces in the plakietka caption row alongside ULDK GUGiK / NMT / Geoportal ORTO.
+
+#### C5 — Plot info label
+
+Three-line callout pinned at the polygon centroid (`Balice 773` / `711 m²` / `Maks. zabudowa 213 m² · wys. 9 m`) rendered through the new `label` renderer (Cesium `LabelGraphics` + `DistanceDisplayCondition`). Auto-hides past 2 km so the multi-line pill doesn't float over Małopolska-scale framing where it'd be illegible. Centroid is the vertex-average of the polygon's unique points — for a 60 m × 50 m parcel the visual difference vs. an edge-length-weighted true centroid is sub-pixel; vertex-average is cheap, deterministic, and works on any boundary with ≥ 3 unique vertices. The label deliberately does NOT get its own plakietka attribution row because it's a derived view of the polygon's own data — same `ULDK GUGiK · TERYT` source already credited under the granice row.
+
+#### C6 — Dynamic overlay-count indicator
+
+The M2.5-B hardcoded `<span>1 nakładka aktywna</span>` in `page.tsx` moves into `Plot3DViewClient.tsx`. A React state `visibleOverlayCount` mirrors `layerRegistry.getVisible().length` via the registry's `subscribe(...)` channel, seeded by the initial `add()` calls and refreshed automatically when M3's panel toggles flip visibility — no extra plumbing needed at the indicator layer. Polish pluralization helper `pluralizeNakladka(n)` handles the 1 / 2-4 / 5+ split with the 12-14 carve-out so the grammar reads correctly across the entire registry-count range. Indicator position moves from top-right (collides with the M2.5-D fullscreen toggle) to top-left — info on the reading side, action on the manipulation side.
+
+#### C3 → C8 — Buildings rolled back (parked for replacement)
+
+Cesium OSM Buildings (ION 96188) landed in C3 and rolled back in C8 + C9 after the visual-ack pass. Three independent failure modes drove the revert, any one of which would have been disqualifying on its own:
+
+- **Alignment with ×2 terrain exaggeration (M2.5-A invariant).** Building footprints from the ION tileset sit at true ground elevation in WGS84 ECEF; the surrounding NMT mesh is rendered at 2× height via `Scene.verticalExaggeration`. The two coordinate spaces don't compose — kostki float in mid-air over hills and tunnel into hollows on Balice 773's local relief. A correct fix needs either matching building-side exaggeration (Cesium 3D Tiles styling can't apply geometric scaling) or disabling terrain-side exaggeration (drops the entire M2.5-A relief read). Neither was tractable inside an M2.7-scope iteration; the larger fix requires per-feature Z-translation against a sampled local terrain height, which is essentially Phase B M9 territory anyway.
+- **Editorial style mismatch.** OSM Buildings massing is abstract grey-glass cubes; even with the paper/clay tint override (`rgba(228, 218, 196, 0.88)`), the geometric language reads as architectural diagram rather than editorial map. Same brand-DNA conflict the project resolved against rainbow slope shading and saturated WMS overlays at earlier ack passes: when in doubt, lean Atelier paper-and-clay, not Autodesk grey.
+- **Visual noise dominates polygon.** The plot polygon is the page's foreground subject; any massing the OSM buildings layer adds — even at low opacity — visually competes with the polygon outline rather than anchoring it. Streets at 0.55 opacity stay subordinate because they're 1D linework; buildings at any opacity are 2D extruded volumes that win the contrast battle. The plot-as-figure invariant is core to the editorial promise and isn't negotiable.
+
+Forward-only revert (no `git revert`) because the C3 introduction diff is buried inside the M2.7 stack and reversing it would dirty the chain history. C8 strips the registration + the two `BUILDINGS_*` constants from `Plot3DViewClient.tsx`; C9 updates the indicator docblock + the plakietka caption (5 rows → 4 rows: granice działki | ulice | teren | ortofoto). The dynamic indicator switches from "4 nakładki aktywne" to "3 nakładki aktywne" automatically through the C6 subscribe channel — exactly the dynamic-binding payoff that commit was set up to deliver, with no manual edit at the indicator site.
+
+**Foundation preserved on purpose.** `tilesetRenderer.ts` + its full test suite stay live (race-safe async load, fail-soft load posture, color override path). `tileset` stays in the `OverlayGeometry` discriminated union; the dispatcher's `case "tileset"` route stays wired with the exhaustiveness check, so any future union addition still fires the build-time guard. Phase B M9's extruded MPZP envelopes are the leading replacement candidate; if MPZP doesn't land, any future Cesium 3D Tiles asset can plug in through the same renderer without re-deriving the load-disposer dance. The lesson going forward — re-derived in three places now (this milestone, M2.6 C3 hillshade, M1 Geoportal probe) — is that the union + dispatcher + renderer triad is the cheap part; deciding what's actually worth registering is the load-bearing decision.
+
+#### Visual ack — 2026-05-11 late night (partial)
+
+Stakeholder confirmed at `localhost:3000/plots/dzialka-balice-773`: streets visible (subtle road network at 0.55 opacity above ortofoto); plot info label visible at polygon centroid (`Balice 773` / `711 m²` / `Maks. zabudowa 213 m² · wys. 9 m`) and auto-hides past 2 km; indicator top-left reads "3 nakładki aktywne" with correct Polish grammar (`nakładki`, not `nakładek`); plakietka has 4 attribution segments (granice / ulice / teren / ortofoto). M2.5 ×2 exaggeration, M2.6 sun + relief shading, polygon outline + drape glow all preserved. No FPS regression vs. M2.6 baseline. Buildings rollback approved on the same pass.
+
+Test suite at M2.7 close: 168/168 (27 new since M2.6 close — 4 type tests + 6 raster + 7 tileset + 8 label + 6 dispatcher). tsc + lint clean. The tileset renderer's tests stay green even with no production consumer — they exercise the renderer through synthetic registrations, so the foundation's regression surface is preserved against any future replacement.
+
+#### Parked for M2.8 / M3 / M16 (carry-forward post-M2.7)
+
+- **M2.8 cartographic detail overlays (plot vicinity)** — successor to the rolled-back buildings layer. Two thematic raster overlays through the M2.7 `raster` renderer, both derived from the existing NMT GRID1 bake (no new source data, no new dependencies):
+  - **Contour lines (warstwice)** — derived locally from the NMT mesh at bake time (`gdal_contour` → GeoJSON → raster tile pyramid), hosted on R2 alongside the terrain tileset. Renders above ortofoto + below streets so the polygon outline + plot info label stay on top. Editorial choice: clay-ink lines at 0.45 opacity, contour interval 1 m (matches the NMT vertical precision floor for GRID1).
+  - **Slope shading (cieniowanie spadków)** — local hillshade from the same NMT mesh; same Atelier paper-and-clay palette as the rest of the viewer (NOT the rainbow slope scale Geoportal exposes by default). Subordinate to the polygon, not dominant. Revives the M2.6 C3 hillshade scope but re-anchored to "plot vicinity" — bbox ~100 m around the parcel rather than the whole Strefa-7 mosaic, so the bake is cheap and the visual signal stays focused on the buyer's actual decision surface.
+  - **Why not buildings (yet).** The C8 lessons narrow the buildings revival window to two candidates only: Phase B M9 extruded MPZP envelopes (real volumetric massing that earns its visual weight + actually serves the killer-feature thesis) or a hand-curated per-plot buildings layer at Phase A.5 mass-replication time. Generic OSM 3D buildings don't compose with the editorial DNA and don't justify the ×2 exaggeration regression they introduce. Until one of those tracks is funded, the buildings layer stays parked — the `tileset` foundation is the only piece kept warm.
+  - **Time:** 4–6 h. Bottleneck is the contour-line bake step — `scripts/build-terrain-tiles.mjs` grows a stage 6 alongside the existing octvertexnormals + bounds-trim passes. The renderer side is free (rides the same `raster` kind streets uses).
+- **M2.7 hillshade overlay (M2.6 C3 carry-forward)** — formally absorbed into M2.8 above. Slope shading and "M2.6 C3 hillshade" describe the same bake artefact at different rendering configs, so they share a single deliverable.
+- **M3 layer control panel UI** — still parked; queues after M2.8 (was M2.7). Foundation extended in M2.7 (`LayerRegistry` + `OverlayLayer` types + 5 renderer kinds in the union with 4 wired through the dispatcher + `subscribe` channel). M3 binds the toggle UX to the subscribe channel and surfaces the 3 visible overlays from M2.7 + the M2.8 contour / slope additions. Phase B's `viewMode` plumbing rides on the same panel — internal "buyer / investor / developer" toggle becomes user-visible.
+- **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.6 carry-forward.
+- **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.6 carry-forward.
+
 ### M3 — Layer control panel UI (gateway for M4–M7) + UI mode foundation
 
 **Scope:** Editorial sidebar/overlay component in Atelier style (Fraunces section header, Instrument Sans labels, JetBrains Mono metadata, paper background, soft border). Initial state: 7 toggles, all OFF except "Ortofoto" (always-on baseline). State held in URL params (`?layers=orto,mpzp,kiut`) for shareable links. Mobile: bottom-sheet collapse pattern.
