@@ -174,29 +174,44 @@ const LIGHTING_FADE_IN_DISTANCE_M = 1;
 // — until then `scene.light` is M2.6's editorial rake.
 const SUN_AZIMUTH_DEG = 315;
 const SUN_ALTITUDE_DEG = 30;
-// ADR-0006 M2.7 C4 — CartoDB Voyager streets-only labels overlay.
-// The `voyager_only_labels` style (vs the regular `voyager` basemap)
-// strips out the basemap fill and keeps only the road network +
-// place labels with the editorial CartoDB palette — clean overlay
-// shape that composites cleanly above the Geoportal ORTO base.
-// Free for non-commercial use under CartoDB's terms; attribution
-// surfaces in the M2.7 plakietka caption row.
-const CARTODB_STREETS_URL =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png";
-const CARTODB_STREETS_SUBDOMAINS = ["a", "b", "c", "d"];
-const CARTODB_STREETS_MAX_LEVEL = 19;
-// M2.9 iteration knob — original M2.7 ack value 0.55 read too
-// subtle once the M2.8 contour + slope overlays joined the imagery
-// stack and the M2.9 zoom cap kept the camera at plot-vicinity
-// altitudes where streets matter most as navigable context. 0.80
-// keeps the road network legible as an anchor without crossing
-// into "streets dominate polygon" territory — verified against the
-// editorial-subordination invariant the M2.7 buildings rollback
-// established (polygon stays the page's foreground subject). If
-// visual ack at 0.80 still reads insufficient, switch tile
-// provider to Stamen Toner Lines (Stadia Maps) for a higher-
-// contrast linework palette.
-const CARTODB_STREETS_OPACITY = 0.8;
+// ADR-0006 M2.9 iteration — Stamen Toner Lines streets overlay
+// (Stadia Maps). Replaces the M2.7 CartoDB Voyager labels variant:
+// post-M2.8 the contour + slope overlays joined the imagery stack
+// and the M2.9 zoom cap kept the camera at plot-vicinity altitudes
+// where streets matter most as navigable anchor context. Voyager's
+// labels-only palette read as subtle anchor at M2.7-close and lost
+// that function once the cartographic-detail overlays arrived;
+// bumping opacity to 0.80 wasn't enough. Toner Lines is bold-by-
+// design — high-contrast black linework on transparent ground —
+// so a moderate layer α (0.65) restores street prominence without
+// crossing the polygon-as-foreground-subject invariant the M2.7
+// buildings rollback established.
+//
+// Provider notes:
+//   - Stadia Maps free dev tier accepts unauthenticated requests
+//     from localhost; production API key handling parked to M3+
+//     (the M3 layer panel is the natural site to wire per-layer
+//     auth config + per-environment tile origins).
+//   - The `{r}` retina suffix in Stadia's canonical URL template
+//     is dropped here because Cesium's UrlTemplateImageryProvider
+//     does not substitute it; requesting the literal `{r}` 404s.
+//     The 1× tiles are sufficient at the viewer's altitude range.
+//   - Toner Lines tops out at z18 (vs. CartoDB Voyager's z19 at
+//     M2.7); the bake-and-style detail at our plot-vicinity
+//     altitudes never exceeds z18 either, so this matches.
+//   - No `{s}` subdomain rotation — Stadia serves from a single
+//     origin and handles load-balancing server-side.
+//
+// Editorial caveat (held for review): pure-black Toner Lines may
+// read "Google Earth generic" against the paper/clay/ink Atelier
+// DNA. If post-switch visual ack flags brand mismatch, the parked
+// next step is custom-rendering the streets layer with an
+// ink-color stroke (M3+ territory, requires either a vector tile
+// pipeline or a server-side recolor of the raster bake).
+const STAMEN_STREETS_URL =
+  "https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}.png";
+const STAMEN_STREETS_MAX_LEVEL = 18;
+const STAMEN_STREETS_OPACITY = 0.65;
 // ADR-0006 M2.8 C3 — contour-line overlay derived from the NMT
 // GRID1 1 m mosaic (the same bake M2 produces and M2.6 self-heals
 // with octvertexnormals). Pre-baked PNG pyramid; the tile pipeline
@@ -678,22 +693,25 @@ export function Plot3DViewClient({
         },
       });
 
-      // M2.7 C4 — CartoDB Voyager streets-only labels overlay.
-      // Subtle ink-and-clay road network sits above the Geoportal
-      // ORTO base at 0.55 opacity so the imagery stays readable
-      // underneath. Anchors urban context without dominating.
+      // M2.9 iteration — Stamen Toner Lines streets overlay
+      // (Stadia Maps). Bold-by-design black linework sits above
+      // the Geoportal ORTO base at 0.65 opacity, restoring the
+      // navigable-anchor function the M2.7 CartoDB Voyager
+      // variant lost once the M2.8 contour + slope overlays
+      // joined the imagery stack. Plakietka caption row updated
+      // in `src/app/plots/[slug]/page.tsx` to match. No
+      // subdomains field — Stadia serves from a single origin.
       layerRegistry.add({
         id: "streets-balice",
         name: "Ulice",
         visible: true,
         geometry: {
           kind: "raster",
-          urlTemplate: CARTODB_STREETS_URL,
-          subdomains: CARTODB_STREETS_SUBDOMAINS,
-          maximumLevel: CARTODB_STREETS_MAX_LEVEL,
+          urlTemplate: STAMEN_STREETS_URL,
+          maximumLevel: STAMEN_STREETS_MAX_LEVEL,
         },
-        style: { color: "#000000", opacity: CARTODB_STREETS_OPACITY },
-        source: { label: "CartoDB Voyager", sourceId: "OSM" },
+        style: { color: "#000000", opacity: STAMEN_STREETS_OPACITY },
+        source: { label: "Stamen Toner Lines", sourceId: "OSM" },
       });
 
       // M2.7 C5 — plot info label anchored at the polygon centroid.

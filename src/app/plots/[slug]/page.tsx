@@ -518,7 +518,7 @@ function ShowcaseThreeDView({
             specific GDAL tool (gdal_contour / gdaldem slope) so a
             buyer scanning the plakietka can see both the
             authoritative upstream + the derivation method. */}
-        <span>Ulice · CartoDB Voyager · OSM</span>
+        <span>Ulice · Stamen Toner Lines · OSM</span>
         <span
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
