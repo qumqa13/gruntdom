@@ -19,7 +19,7 @@
  * the dashboard pins it to specific origins before public deploy.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
@@ -80,6 +80,17 @@ const POLYGON_FILL_ALPHA = 0.15;
 const CAMERA_FLY_DELAY_MS = 800;
 const CAMERA_FLY_DURATION_S = 1.5;
 
+// Minimal structural shape we touch on the running Cesium Viewer from
+// outside the main mount effect. Held in a ref so the activation-sync
+// effect can toggle camera inputs without re-running the (very expensive)
+// mount IIFE. Full Cesium.Viewer is fine to assign here — TypeScript
+// only structurally requires this surface.
+interface ViewerActivationHandle {
+  scene: {
+    screenSpaceCameraController: { enableInputs: boolean };
+  };
+}
+
 async function probeGeoportalOrto(): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(
@@ -105,10 +116,29 @@ export function Plot3DViewClient({
   boundingSphereRadiusM = 25,
   parcelLabel,
 }: Plot3DViewProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // wrapperRef — outer React-managed wrapper, target for click-outside
+  //   detection and the activation overlay siblings.
+  // cesiumMountRef — inner div whose children Cesium owns imperatively;
+  //   React never renders children into it so reconciliation leaves
+  //   Cesium's canvas + widget DOM alone.
+  // viewerHandleRef — references the live Cesium Viewer so the
+  //   activation-sync useEffect can flip enableInputs without re-running
+  //   the (expensive) mount IIFE.
+  // isActiveRef — mirror of `isActive` state so the async mount IIFE
+  //   can apply the user's latest desired state if they click the
+  //   overlay before Cesium finishes its first paint.
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const cesiumMountRef = useRef<HTMLDivElement | null>(null);
+  const viewerHandleRef = useRef<ViewerActivationHandle | null>(null);
+  const isActiveRef = useRef(false);
+  const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!cesiumMountRef.current) return;
     let disposed = false;
     let viewer: { destroy: () => void } | null = null;
     let flyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -116,7 +146,7 @@ export function Plot3DViewClient({
 
     (async () => {
       const Cesium = await import("cesium");
-      if (disposed || !containerRef.current) return;
+      if (disposed || !cesiumMountRef.current) return;
 
       const hasToken = Boolean(ION_TOKEN);
       if (hasToken) {
@@ -159,7 +189,7 @@ export function Plot3DViewClient({
           terrainProvider = new Cesium.EllipsoidTerrainProvider();
         }
       }
-      if (disposed || !containerRef.current) return;
+      if (disposed || !cesiumMountRef.current) return;
 
       // Imagery selection: Geoportal ORTO StandardResolution if reachable
       // within the probe budget; otherwise fall back to Cesium ION default
@@ -189,7 +219,7 @@ export function Plot3DViewClient({
         baseLayer = false;
       }
 
-      const v = new Cesium.Viewer(containerRef.current, {
+      const v = new Cesium.Viewer(cesiumMountRef.current, {
         terrainProvider,
         baseLayer,
         baseLayerPicker: false,
@@ -206,11 +236,20 @@ export function Plot3DViewClient({
         creditContainer: document.createElement("div"),
       });
       viewer = v;
+      viewerHandleRef.current = v;
 
       v.scene.backgroundColor = Cesium.Color.fromCssColorString(PAPER_HEX);
       v.scene.globe.show = true;
       // M2.5-A — visual relief boost; see VERTICAL_EXAGGERATION rationale.
       v.scene.verticalExaggeration = VERTICAL_EXAGGERATION;
+      // M2.5-D — viewer launches inert so wheel events pass through to
+      // page scroll. The click-to-interact overlay flips `isActive`,
+      // which a sibling useEffect mirrors onto enableInputs. Reading
+      // `isActiveRef.current` here covers the race where the user
+      // clicked the overlay before this IIFE finished its first paint:
+      // by the time we reach this line, isActiveRef already reflects
+      // the user's intent and Cesium boots armed.
+      v.scene.screenSpaceCameraController.enableInputs = isActiveRef.current;
 
       // ringForSampling — open ring (no closing duplicate) consumed by
       // the camera-height sampling block below. The overlay renderer
@@ -335,6 +374,7 @@ export function Plot3DViewClient({
       for (const dispose of overlayDisposers) dispose();
       overlayDisposers.length = 0;
       if (viewer) viewer.destroy();
+      viewerHandleRef.current = null;
     };
     // Geometry is plot-scoped; route navigation unmounts the viewer, so a
     // stable terytId is sufficient as the re-init key.
@@ -346,11 +386,68 @@ export function Plot3DViewClient({
     parcelLabel,
   ]);
 
+  // M2.5-D C1 — live sync `isActive` → camera-input gate. Runs every
+  // time the user activates / deactivates; reads viewerHandleRef so a
+  // toggle is a single property write, never a remount.
+  useEffect(() => {
+    const v = viewerHandleRef.current;
+    if (!v) return;
+    v.scene.screenSpaceCameraController.enableInputs = isActive;
+  }, [isActive]);
+
+  // M2.5-D C1 — deactivate when the user presses Esc or clicks outside
+  // the viewer while active. Listener is only attached while active, so
+  // the activation click itself (which lands inside the wrapper anyway)
+  // never reaches this handler.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsActive(false);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (wrapperRef.current && wrapperRef.current.contains(target)) return;
+      setIsActive(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [isActive]);
+
   return (
     <div
-      ref={containerRef}
-      className="h-full w-full"
-      data-testid="plot3d-cesium-container"
-    />
+      ref={wrapperRef}
+      className="relative h-full w-full"
+      data-testid="plot3d-wrapper"
+      data-active={isActive ? "true" : "false"}
+    >
+      <div
+        ref={cesiumMountRef}
+        className="absolute inset-0"
+        data-testid="plot3d-cesium-container"
+      />
+      {!isActive && (
+        <button
+          type="button"
+          onClick={() => setIsActive(true)}
+          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-paper/30 transition-colors duration-200 hover:bg-paper/20"
+          aria-label="Aktywuj sterowanie widokiem 3D"
+        >
+          <span className="rounded-xs border border-line/60 bg-paper/95 px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted shadow-card">
+            Kliknij aby przesuwać
+          </span>
+        </button>
+      )}
+      {isActive && (
+        <div
+          className="pointer-events-none absolute inset-0 ring-2 ring-clay/40 ring-inset"
+          aria-hidden
+        />
+      )}
+    </div>
   );
 }
