@@ -185,7 +185,18 @@ const CARTODB_STREETS_URL =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png";
 const CARTODB_STREETS_SUBDOMAINS = ["a", "b", "c", "d"];
 const CARTODB_STREETS_MAX_LEVEL = 19;
-const CARTODB_STREETS_OPACITY = 0.55;
+// M2.9 iteration knob — original M2.7 ack value 0.55 read too
+// subtle once the M2.8 contour + slope overlays joined the imagery
+// stack and the M2.9 zoom cap kept the camera at plot-vicinity
+// altitudes where streets matter most as navigable context. 0.80
+// keeps the road network legible as an anchor without crossing
+// into "streets dominate polygon" territory — verified against the
+// editorial-subordination invariant the M2.7 buildings rollback
+// established (polygon stays the page's foreground subject). If
+// visual ack at 0.80 still reads insufficient, switch tile
+// provider to Stamen Toner Lines (Stadia Maps) for a higher-
+// contrast linework palette.
+const CARTODB_STREETS_OPACITY = 0.8;
 // ADR-0006 M2.8 C3 — contour-line overlay derived from the NMT
 // GRID1 1 m mosaic (the same bake M2 produces and M2.6 self-heals
 // with octvertexnormals). Pre-baked PNG pyramid; the tile pipeline
