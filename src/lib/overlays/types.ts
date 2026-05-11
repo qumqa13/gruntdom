@@ -22,35 +22,103 @@ export type LngLat = [number, number];
  */
 export type PolygonRing = ReadonlyArray<LngLat>;
 
+/**
+ * Raster imagery overlay (XYZ tile URL template). Renderer wraps a
+ * `UrlTemplateImageryProvider` and inserts the resulting `ImageryLayer`
+ * above the base ortofoto. Used in M2.7 for the CartoDB Voyager streets
+ * reference; parked-hillshade revival from M2.6 C3 will reuse the same
+ * variant. Subdomains let CartoDB-style `{s}.basemaps.cartocdn.com`
+ * templates round-robin; minimum/maximumLevel match the Cesium tiling
+ * scheme to avoid asking for tiles the provider doesn't have.
+ */
+export interface RasterGeometry {
+  readonly kind: "raster";
+  readonly urlTemplate: string;
+  readonly subdomains?: ReadonlyArray<string>;
+  readonly minimumLevel?: number;
+  readonly maximumLevel?: number;
+}
+
+/**
+ * Cesium 3D Tiles tileset hosted on Cesium ION. M2.7 ships exactly one
+ * instance (asset 96188 — Cesium OSM Buildings, free worldwide). The
+ * geometry payload stays minimal; the tileset's color override and
+ * other visual tuning live on `OverlayStyle.color` so a future
+ * non-ION-hosted tileset (extruded MPZP envelopes in Phase B M9) can
+ * extend this variant without changing the style surface.
+ */
+export interface TilesetGeometry {
+  readonly kind: "tileset";
+  readonly ionAssetId: number;
+}
+
+/**
+ * Anchored multi-line text label. Rendered as a Cesium `Entity` with
+ * `LabelGraphics` + `DistanceDisplayCondition` so the label appears
+ * only when the camera is between the min/max visibility distances —
+ * lets a plot info card disappear when the user pulls back to the
+ * Małopolska view where the label would become illegible noise. M2.7
+ * uses this for the plot dimensions / area / Maks-zabudowa card
+ * anchored to the polygon centroid.
+ */
+export interface LabelGeometry {
+  readonly kind: "label";
+  readonly position: LngLat;
+  readonly lines: ReadonlyArray<string>;
+  /** Hidden when camera distance > this. Default Infinity (never hides at distance). */
+  readonly maxVisibleDistanceM?: number;
+  /** Hidden when camera distance < this. Default 0. */
+  readonly minVisibleDistanceM?: number;
+  /** Screen-space pixel offset along Y from the anchor (negative = up). Default -32. */
+  readonly pixelOffsetY?: number;
+}
+
 export type OverlayGeometry =
   | { readonly kind: "polygon"; readonly boundary: PolygonRing }
-  | { readonly kind: "polyline"; readonly path: ReadonlyArray<LngLat> };
+  | { readonly kind: "polyline"; readonly path: ReadonlyArray<LngLat> }
+  | RasterGeometry
+  | TilesetGeometry
+  | LabelGeometry;
 
 /**
  * Visualization style. Renderers fall back to sensible defaults when a
  * field is omitted, so a minimal `{ color }` style is enough for an MVP
  * overlay; the optional fields exist for fine-tuning during visual ack.
+ *
+ * Field applicability by geometry kind:
+ * - `polygon`: color (fill + stroke base), fillAlpha, outlineAlpha,
+ *   outlineWidthPx, drapeGlow, glowPower.
+ * - `polyline`: color, outlineAlpha, outlineWidthPx (no renderer yet
+ *   — type exists, renderer parked).
+ * - `raster`: opacity (color is ignored — provider supplies imagery).
+ * - `tileset`: color (passed to `Cesium3DTileStyle.color` as the per-
+ *   feature tint, wrapped as `color("…")`).
+ * - `label`: color (text fill), backdropColor (pill background),
+ *   font (CSS font string).
  */
 export interface OverlayStyle {
-  /** Fill / stroke base color as a CSS hex string (e.g. `"#B95F3E"`). */
+  /** Primary color CSS string (`#RRGGBB`, `rgb(...)`, `rgba(...)`). */
   color: string;
-  /** Fill alpha [0..1]. Ignored for polylines. Default 0.30. */
+  /** Polygon fill alpha [0..1]. Default 0.30. */
   fillAlpha?: number;
-  /** Outline / stroke alpha [0..1]. Default 1. */
+  /** Polygon / polyline outline alpha [0..1]. Default 1. */
   outlineAlpha?: number;
-  /** Outline / stroke width in pixels. Default 2. */
+  /** Polygon / polyline outline width in pixels. Default 2. */
   outlineWidthPx?: number;
-  /**
-   * Render an outer drape glow (faint halo that stays visible at low
-   * zoom and recedes at close range). Default `false` to keep new
-   * overlays quiet by default.
-   */
+  /** Polygon outer drape glow. Default false. */
   drapeGlow?: boolean;
-  /**
-   * Glow strength [0..1] when `drapeGlow` is true. Default 0.12 (subtle
-   * — visible at Małopolska-scale, recessive at plot-scale).
-   */
+  /** Polygon glow strength [0..1] when `drapeGlow` is true. Default 0.12. */
   glowPower?: number;
+  /** Raster overlay opacity [0..1]. Default 1. Applied as `ImageryLayer.alpha`. */
+  opacity?: number;
+  /**
+   * Label pill backdrop CSS color (paper tone behind the text). When
+   * omitted Cesium falls back to its translucent black default; the
+   * Atelier system overrides to `bg-paper/95`-equivalent.
+   */
+  backdropColor?: string;
+  /** Label font CSS string. Default `"12px 'JetBrains Mono', monospace"`. */
+  font?: string;
 }
 
 /** Provenance label rendered in the plakietka. Mirrors `DataProvenance` spirit but stays small for layer-panel UX. */
