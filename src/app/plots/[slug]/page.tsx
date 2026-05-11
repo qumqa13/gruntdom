@@ -293,7 +293,7 @@ export default async function PlotDetailPage({ params }: PlotPageProps) {
                   number="05"
                   eyebrow="Teren · 3D"
                   title="Działka w skali geograficznej"
-                  description="Pofałdowanie gruntu, kontekst lotniska Balice i sąsiedztwo widziane w katalogowych proporcjach. Polygon ULDK GUGiK osadzony na cyfrowym modelu wysokościowym Cesium World Terrain — slab podąża za zboczem N-S."
+                  description="Pofałdowanie gruntu, kontekst lotniska Balice i sąsiedztwo widziane w katalogowych proporcjach. Polygon ULDK GUGiK osadzony na polskim cyfrowym modelu wysokościowym (NMT GRID1, 1 × 1 m, PZGiK) — slab podąża za zboczem N-S."
                 />
                 <div className="mt-8">
                   <ShowcaseThreeDView
@@ -482,7 +482,7 @@ function ShowcaseThreeDView({
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
         />
-        <span>Teren · Cesium World Terrain (ION asset 1)</span>
+        <span>Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m</span>
         <span
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden

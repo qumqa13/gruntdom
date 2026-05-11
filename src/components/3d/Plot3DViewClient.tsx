@@ -1,14 +1,18 @@
 "use client";
 
 /**
- * F2-T1 spike + ADR-0006 M1 — Cesium client mount.
+ * F2-T1 spike + ADR-0006 M1 + M2 — Cesium client mount.
  *
  * Imagery: Geoportal ORTO StandardResolution via /api/geoportal/wms proxy
  *   (25-50 cm/px Polish ortofoto). Pre-flight probe with 3 s timeout; if
  *   the proxy or upstream Geoportal is unhealthy, fall back to Bing Maps
  *   Aerial (ION asset 2, ~1 m/px in Poland).
- * Terrain: Cesium ION World Terrain (Tier 2 per ADR-0002 §6.3), with
- *   ellipsoid fallback when the ION token is missing.
+ * Terrain: Polish NMT GRID1 1m quantized-mesh tiles served from
+ *   `getTerrainStorage().getTilesetUrl("balice")` (ADR-0006 M2 — produced
+ *   by `npm run build-terrain`, hosted locally under `public/terrain-tiles/`
+ *   in dev and on Cloudflare R2 in production). Fallback cascade on tile
+ *   404 / fetch failure: ION World Terrain (asset 1, requires token), then
+ *   the flat ellipsoid.
  *
  * Token routing: Path A (NEXT_PUBLIC_CESIUM_ION_TOKEN, ION-direct) per
  * ADR-0005. Free-tier domain-restricted JWT is browser-bearer by design;
@@ -18,6 +22,8 @@
 import { useEffect, useRef } from "react";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
+
+import { getTerrainStorage } from "@/lib/terrain/storage";
 
 import type { Plot3DViewProps } from "./Plot3DView";
 
@@ -35,6 +41,11 @@ if (typeof window !== "undefined" && !window.CESIUM_BASE_URL) {
 }
 
 const ION_TOKEN = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN ?? "";
+
+// ADR-0006 M2 — tileset slug under the configured terrain storage base.
+// Currently the only baked tileset (depth-first scope on Balice 773 per
+// ADR-0006 v3); per-plot pyramids land with Phase A.5 mass replication.
+const NMT_TILESET_NAME = "balice";
 
 const CLAY_HEX = "#b54a2c";
 const PAPER_HEX = "#f4eedf";
@@ -102,19 +113,34 @@ export function Plot3DViewClient({
       let terrainProvider:
         | InstanceType<typeof Cesium.CesiumTerrainProvider>
         | InstanceType<typeof Cesium.EllipsoidTerrainProvider>;
-      if (hasToken) {
-        try {
-          terrainProvider =
-            await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
-        } catch (err) {
-          console.warn(
-            "[Plot3DView] ION terrain load failed; falling back to ellipsoid",
-            err,
-          );
+      const nmtTilesetUrl = getTerrainStorage().getTilesetUrl(
+        NMT_TILESET_NAME,
+      );
+      try {
+        // ADR-0006 M2 — Polish NMT 1m quantized-mesh. Cesium probes
+        // `${url}/layer.json` then fetches tiles per `available[]`.
+        terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+          nmtTilesetUrl,
+        );
+      } catch (nmtErr) {
+        console.warn(
+          `[Plot3DView] Polish NMT terrain load failed (${nmtTilesetUrl}); falling back to ION/ellipsoid. Did \`npm run build-terrain\` run?`,
+          nmtErr,
+        );
+        if (hasToken) {
+          try {
+            terrainProvider =
+              await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+          } catch (ionErr) {
+            console.warn(
+              "[Plot3DView] ION terrain fallback also failed; using ellipsoid",
+              ionErr,
+            );
+            terrainProvider = new Cesium.EllipsoidTerrainProvider();
+          }
+        } else {
           terrainProvider = new Cesium.EllipsoidTerrainProvider();
         }
-      } else {
-        terrainProvider = new Cesium.EllipsoidTerrainProvider();
       }
       if (disposed || !containerRef.current) return;
 
@@ -200,11 +226,10 @@ export function Plot3DViewClient({
       // Camera positioning still needs an absolute ground baseline (the camera
       // is in WGS84 ECEF, not terrain-relative). Sample once to anchor the
       // initial top-down view + fly-to altitude relative to actual elevation.
+      // Both the NMT-URL and ION terrain paths produce CesiumTerrainProvider,
+      // so the instanceof gate is sufficient — no longer tied to hasToken.
       let cameraGroundHeight = 0;
-      if (
-        hasToken &&
-        terrainProvider instanceof Cesium.CesiumTerrainProvider
-      ) {
+      if (terrainProvider instanceof Cesium.CesiumTerrainProvider) {
         try {
           const sampled = await Cesium.sampleTerrainMostDetailed(
             terrainProvider,
