@@ -460,12 +460,20 @@ function ShowcaseThreeDView({
     : title;
   return (
     <div className="space-y-3">
-      <div className="h-[360px] w-full sm:h-[480px]">
+      <div className="relative h-[360px] w-full sm:h-[480px]">
         <Plot3DView
           geometry={geometry}
           frontAzimuthDeg={geometry.frontAzimuth}
           parcelLabel={parcelLabel}
         />
+        {/* M2.5-B — corner overlay indicator. Foreshadows the M3 layer
+            control panel: the count is hard-coded for now because
+            Plot3DViewClient owns the LayerRegistry locally; M3 will lift
+            the registry up and bind this label to LayerRegistry.size().
+            pointer-events-none keeps Cesium drag interactions intact. */}
+        <span className="pointer-events-none absolute right-3 top-3 rounded-xs border border-line/40 bg-paper/85 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+          1 nakładka aktywna
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
@@ -473,7 +481,7 @@ function ShowcaseThreeDView({
             className="h-1.5 w-1.5 rounded-full bg-moss"
             aria-hidden
           />
-          Granice działki · ULDK GUGiK
+          Nakładka: Granice działki · ULDK GUGiK
           {geometry.terytId && (
             <span className="text-ink-faint"> · {geometry.terytId}</span>
           )}
