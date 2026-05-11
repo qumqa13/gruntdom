@@ -142,14 +142,88 @@ Corrected: EVRF2007 service + Strefa-7 + EPSG-spec BBOX axis order → 6 verifie
 
 **Verification on Balice 773:** mosaic Min 217.8 m, Max 341.3 m, StdDev 30.9 m — matches the local topography (Kraków-Balice airport runway head at ~241 m AMSL, plot plateau ~250 m, surrounding ridges into the 280–300 m range). 102 `.terrain` tiles in a healthy z15→z0 ladder. Section 05 polygon clamps onto real NMT topography; the slope to the airport reads west-of-plot in both the initial top-down and the camera-flyto views.
 
-**Parked for M2.5 / M16 (per stakeholder 2026-05-11):**
-- Terrain exaggeration / vertical drama (`Globe.terrainExaggeration`) — keeps the baseline measurement-faithful by default, M2.5 may dial in a per-plot factor
-- NMT GRID 0.5 m availability for Małopolska not yet probed — would replace `SkorowidzNMT2023` with the 0.5 m equivalent if covered
-- Explicit per-vertex normals + hillshade overlay for richer relief readability under low-zoom orthography
-- Mobile fallback (Cesium on phones eats battery; M16 toggles a "Map 2D" downgrade)
-- `layer.json` `bounds` field still defaults to the eastern hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent — purely a request-planner efficiency hint, content geometry is correct via `available[]`. M16 post-process step.
-
 Per ADR v3 depth-first scope, only Balice 773 has a baked tileset. Plots 01–03 exercise the ION fallback in the same `Plot3DViewClient.fromUrl` → `fromIonAssetId(1)` → ellipsoid cascade and won't get Polish-NMT terrain until Phase A.5 mass replication (each plot ≈ one new sheet manifest + one `npm run build-terrain` run).
+
+**Closure on the original M2 parked items lives in §M2.5 below** — exaggeration shipped, the GRID 0.5 m availability question got a definitive probe answer (no-go, see §"NMT GRID0.5 probe finding"), and per-vertex normals / mobile fallback / `layer.json` bounds carry forward to M2.5-D and M16.
+
+### M2.5 — Polish + overlay foundation
+
+**✅ Completed 2026-05-11 on Balice 773** — two stakeholder-acked visual-ack gates (M2.5-A + M2.5-B). M2.5-D parked.
+
+This bundle ships the visualisation refinements that came out of the M2 visual ack plus the overlay infrastructure that turns the parcel boundary into the first member of a future toggleable-layer family. Gated by a GRID0.5 probe (separate section below) that ruled out higher-resolution source data for Małopolska; M2.5 therefore lifts perceived relief via visualisation choices rather than finer NMT.
+
+#### M2.5-A — Terrain exaggeration (×2)
+
+Two commits on `main`:
+- `cf5ab8a` feat(3d): add 2× terrain exaggeration for visual relief clarity
+- `0451c22` feat(3d): disclose ×2 visualization in provenance plakietka
+
+`Scene.verticalExaggeration = 2.0` (Cesium ≥ 1.110; replaces the deprecated `Globe.terrainExaggeration` which was removed from the public API in 1.110). Małopolska relief around Balice — StdDev ≈ 30.9 m over the 3 km × 3 km mosaic — reads nearly flat at the catalogue's default top-down → 45° flyby framing. ×2 doubles the rendered Z without touching the underlying heightmap; `sampleTerrainMostDetailed` still returns true metres so future Phase A M7 measurement tooling stays truth-faithful to the NMT. Camera setView/flyTo destinations are absolute WGS84 and Cesium does NOT scale them by exaggeration, so the camera-height math multiplies the sampled ground height by the same factor — keeps the camera above the exaggerated surface rather than buried inside it.
+
+The provenance plakietka discloses the choice as an italic, ink-faint "· widok ×2 dla czytelności" suffix on the terrain row — the visualisation caveat lives adjacent to the data-source label it modifies, so a reader scanning the plakietka row never mistakes exaggerated geometry for raw measurement.
+
+#### M2.5-B — Polygon as terrain-draped overlay + layer foundation
+
+Six commits on `main`:
+- `1db2493` feat(overlays): add OverlayLayer types and interfaces
+- `fecb8b7` feat(overlays): LayerRegistry implementation
+- `eed7d18` feat(overlays): Cesium polygon overlay renderer
+- `b9ea729` refactor(3d): route Plot3DViewClient polygon through LayerRegistry
+- `7cb478e` feat(3d): caption "Nakładka:" prefix + corner overlay indicator
+- `be4664b` fix(3d): replace emoji status marker with typographic glyph
+
+The M2 extruded-slab pattern (`height: 0` + `CLAMP_TO_GROUND` + `extrudedHeight 3` + `RELATIVE_TO_GROUND`) is gone. The polygon now drapes onto the (verticalExaggeration-aware) NMT mesh via `ClassificationType.TERRAIN` so the outline folds with the relief instead of levitating above it. A wider, fixed-low-alpha ground-clamped polyline beneath the crisp outline supplies a drape-glow halo whose pixel-constant width recedes naturally at close zoom — subtle at plot-scale, visible at Małopolska scale.
+
+Design decisions captured for future overlays (M3 and onward):
+
+- **Semantic layer ids.** `plot-balice-773` instead of `plot-120616_2.0002.773` — share-URLs and the M3 panel surface a readable handle. Mapping lives in `src/lib/overlays/plotLayerId.ts` as a small in-code table; unknown TERYTs fall back to a deterministic `plot-{terytId}` form so the viewer never blocks on a missing entry. Phase A.5 grows the table; M3 may replace it with a `Plot.layerSlug` field on the data model.
+- **`ClassificationType.TERRAIN` over extrusion.** Drape-onto-terrain is the default for parcel and zone overlays going forward. Extrusion is reserved for Phase B MPZP envelope work (M9–M10) where the 3D mass is the feature, not the boundary.
+- **Drape-glow via a second wider polyline.** `PolylineGlowMaterialProperty` on `GroundPolylinePrimitive` is Cesium-version-sensitive; a wider, low-alpha ground-clamped polyline gives a predictable subtle halo that recedes at close zoom because the halo width is screen-space-constant while the polygon scales metrically. Tunable via `GLOW_WIDTH_MULTIPLIER` + per-call `glowPower` in the renderer.
+- **`ArcType.RHUMB` on the outline.** Matches cadastral convention (constant-bearing arcs along boundary segments); closer to how ULDK records and surveyor practice describe parcel edges than `GEODESIC` would be.
+- **Disposer-symmetric renderer ownership.** Each renderer call returns an `OverlayDisposer`; the viewer runs all disposers before `viewer.destroy()`. `destroy()` wipes entities anyway, but the symmetry is the contract M3 and later renderers (timers, listeners) will rely on.
+- **Pure-data registry.** `LayerRegistry` has no Cesium / DOM / React dependency. The same registry could front a 2D Leaflet view or a server-side share-URL serialiser without modification, which keeps the M3 panel free to bind whichever shape it needs (React signals, URL state, server-rendered list — the registry doesn't pick).
+- **Subscribe channel for non-polling refresh.** `LayerRegistry.subscribe(listener)` fires on every mutation; idempotent `setVisible(id, sameValue)` is a no-op (no notify). M3's panel binds visibility toggles to this without polling getAll().
+
+Caption row updated to read `Nakładka: Granice działki · ULDK GUGiK · {terytId} | Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m · *widok ×2 dla czytelności* | Ortofoto · Geoportal ORTO · StandardResolution · PZGiK`, with a leading typographic ● (U+25CF) in CLAY_HEX matching the WebGL outline. The moss CSS dot was replaced after the visual-ack feedback so the row stays inside the editorial typographic system rather than stacking decorative geometry in running text. A small "1 nakładka aktywna" corner indicator inside the viewer foreshadows M3 — JetBrains Mono, ink-faint contrast, paper backdrop, `pointer-events-none` so Cesium drag passes through. The count is hard-coded until M3 lifts the registry up.
+
+Test suite grew from 113 to 136 offline tests across types (4), registry (11), polygon renderer (5), and plot-layer-id mapping (3).
+
+#### Parked for M2.5-D / M16 (carry-forward)
+
+- **M2.5-D fullscreen modal** — UX request from M2 C3 visual ack. Click-to-expand, Esc to close, Atelier-styled paper backdrop. Independent of terrain/overlay work; can land any session.
+- **Per-vertex normals + hillshade overlay** — richer relief readability under low-zoom orthography. Rides on the M2.5-B renderer infrastructure when it lands.
+- **Mobile fallback** — Cesium battery cost on phones; M16 toggles a "Map 2D" downgrade.
+- **`layer.json` `bounds` post-process** — still defaults to the eastern hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent. Efficiency hint only; content geometry is correct via `available[]`.
+
+### NMT GRID0.5 probe finding (2026-05-11)
+
+Probed whether GRID0.5 (50 cm horizontal spacing) was available for Balice as a higher-precision replacement for the GRID1 1 m source data the M2 mosaic uses. **Result: no-go — GRID0.5 is NOT available for Balice on the public Geoportal WFS in any year 2018–2025.** GRID1 1 m is the realistic resolution floor for Małopolska public terrain data; Phase A higher-fidelity relief therefore comes from visualisation choices (M2.5-A exaggeration, possibly M16 hillshade overlay) rather than higher-resolution source.
+
+- Method: WFS GetFeature against `mapy.geoportal.gov.pl/wss/service/PZGIK/NumerycznyModelTerenuEVRF2007/WFS/Skorowidze` for each `gugik:SkorowidzNMT{2018..2025}` year layer, EPSG:4326 BBOX `50.080,19.770,50.100,19.810` (lat,lon — EPSG-spec order, avoids the runbook §0 axis-order trap).
+- GetCapabilities listed only year-keyed typenames; spacing lives in the per-feature `char_przestrz` attribute, not a separate layer.
+- 43 features returned across the 7 reachable years (2022 failed with a TLS schannel abort on every retry — server-side, layer-specific). Spread:
+
+  | Year | Sheets | `char_przestrz` distribution |
+  |---|---:|---|
+  | 2025 | 1 | 1.00 m |
+  | 2024 | 4 | 1.00 m × 4 |
+  | 2023 | 12 | 1.00 m × 12 (includes the 6 Strefa-7 sheets currently baked) |
+  | 2022 | — | TLS schannel abort, server-side |
+  | 2021 | 9 | 1.00 m × 9 |
+  | 2020 | 0 | — (no features for Balice bbox) |
+  | 2019 | 12 | 5.00 m × 8, 1.00 m × 4 |
+  | 2018 | 5 | 25.0 m × 1, 5.00 m × 1, 1.00 m × 3 |
+
+  **Zero 0.50 m sheets observed.** The older-coarser, newer-1m-only trend makes it implausible that 2022 alone hides a 0.50 m batch.
+
+- Three plausible GRID0.5-specific WFS path variants all returned HTTP 401 Unauthorized (body: bare `<html><head><title>Unauthorized.</title>…`):
+  - `…/NMT/GRID05/WFS/Skorowidze` → 401
+  - `…/NMT/GRID0_5/WFS/Skorowidze` → 401
+  - `…/NumerycznyModelTerenu/WFS/Skorowidze` → 401
+
+  401 (not 404) implies the paths exist server-side but are gated. **Parked as Bucket #3** — authenticated access is out of scope for Phase A and only becomes worth pursuing as part of a Phase B/C commercial LiDAR investment.
+
+- Probe artefacts under `.cache/wfs-probe/` (gitignored).
 
 ### M3 — Layer control panel UI (gateway for M4–M7) + UI mode foundation
 
