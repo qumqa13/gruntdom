@@ -473,14 +473,14 @@ function ShowcaseThreeDView({
           frontAzimuthDeg={geometry.frontAzimuth}
           parcelLabel={parcelLabel}
         />
-        {/* M2.5-B → M2.7 C6 — the "X nakładka aktywna" indicator used
-            to live here as a hardcoded "1" span. M2.7 lifted it into
-            Plot3DViewClient where the LayerRegistry is the source of
-            truth; the count now reflects actual registered overlays
-            (4 by default: polygon + buildings + streets + plot info).
-            Future M3 panel toggles update the indicator automatically
-            through the registry's subscribe channel — no extra plumbing
-            needed at this layer. */}
+        {/* M2.5-B → M2.7 C6 + C9 — the "X nakładka aktywna" indicator
+            used to live here as a hardcoded "1" span. M2.7 lifted it
+            into Plot3DViewClient where the LayerRegistry is the source
+            of truth; the count now reflects actual registered overlays
+            (3 by default after the C8 buildings rollback: polygon +
+            streets + plot info). Future M3 panel toggles update the
+            indicator automatically through the registry's subscribe
+            channel — no extra plumbing needed at this layer. */}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
@@ -507,18 +507,14 @@ function ShowcaseThreeDView({
           className="hidden h-3 w-px bg-line sm:inline-block"
           aria-hidden
         />
-        {/* M2.7 C6 — buildings + streets attribution rows alongside the
-            existing terrain + ortofoto provenance. The plot info label
-            (M2.7 C5) does NOT get its own row because it's a derived
-            view of the polygon's own data — same `ULDK GUGiK` source
-            already credited above. Both new rows surface the upstream
-            data origin (ION OSM, OpenStreetMap via CartoDB) so a buyer
-            scanning the plakietka can see what they're looking at. */}
-        <span>Budynki · Cesium OSM Buildings · ION 96188</span>
-        <span
-          className="hidden h-3 w-px bg-line sm:inline-block"
-          aria-hidden
-        />
+        {/* M2.7 C6 + C9 — streets attribution row alongside the existing
+            granice + terrain + ortofoto provenance (4 rows total after
+            the C8 buildings rollback). The plot info label (M2.7 C5)
+            does NOT get its own row because it's a derived view of the
+            polygon's own data — same `ULDK GUGiK` source already
+            credited above. CartoDB Voyager / OSM surfaces the upstream
+            road-network origin so a buyer scanning the plakietka can
+            see what they're looking at. */}
         <span>Ulice · CartoDB Voyager · OSM</span>
         <span
           className="hidden h-3 w-px bg-line sm:inline-block"
