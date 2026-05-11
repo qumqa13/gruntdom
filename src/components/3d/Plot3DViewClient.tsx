@@ -141,6 +141,17 @@ const CARTODB_STREETS_URL =
 const CARTODB_STREETS_SUBDOMAINS = ["a", "b", "c", "d"];
 const CARTODB_STREETS_MAX_LEVEL = 19;
 const CARTODB_STREETS_OPACITY = 0.55;
+// ADR-0006 M2.7 C5 — plot info label visibility threshold. Hidden
+// past 2 km because the multi-line pill becomes illegible noise at
+// Małopolska-scale framing; visible inside that band where the
+// polygon footprint is large enough on screen to anchor the
+// callout meaningfully. Pixel offset lifts the pill 32 px above
+// the anchor so it doesn't overlap the polygon's clay outline.
+const PLOT_INFO_MAX_VISIBLE_DISTANCE_M = 2000;
+const PLOT_INFO_PIXEL_OFFSET_Y = -32;
+const PLOT_INFO_TEXT_COLOR = "#2d2a26";
+const PLOT_INFO_BACKDROP_COLOR = "rgba(244, 238, 223, 0.95)";
+const PLOT_INFO_FONT = "11px 'JetBrains Mono', monospace";
 const GEOPORTAL_WMS_PROXY = "/api/geoportal/wms";
 const GEOPORTAL_ORTO_LAYER = "ORTO_STANDARD";
 const GEOPORTAL_PROBE_TIMEOUT_MS = 3_000;
@@ -532,6 +543,51 @@ export function Plot3DViewClient({
         },
         style: { color: "#000000", opacity: CARTODB_STREETS_OPACITY },
         source: { label: "CartoDB Voyager", sourceId: "OSM" },
+      });
+
+      // M2.7 C5 — plot info label anchored at the polygon centroid.
+      // Three-line callout (parcel + area + Maks-zabudowa) auto-hides
+      // past 2 km via DistanceDisplayCondition so the pill doesn't
+      // float over the Małopolska view where it'd be illegible.
+      // Centroid is the average of the polygon's unique vertices
+      // (closing duplicate skipped) — a true polygon centroid would
+      // weight by edge length but for a 60 m × 50 m parcel the visual
+      // difference is sub-pixel; vertex-average is cheap, deterministic,
+      // and works on any boundary that has at least 3 unique vertices.
+      // Area + Maks-zabudowa values are the stakeholder-spec'd Balice
+      // 773 constants — Phase A.5 mass replication will lift them
+      // through a per-plot data binding alongside the polygon itself.
+      const labelRing = geometry.boundary.slice(0, -1);
+      const labelLngSum = labelRing.reduce((acc, [lng]) => acc + lng, 0);
+      const labelLatSum = labelRing.reduce((acc, [, lat]) => acc + lat, 0);
+      const labelCentroidLng = labelLngSum / labelRing.length;
+      const labelCentroidLat = labelLatSum / labelRing.length;
+      const labelParcel =
+        parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
+      layerRegistry.add({
+        id: "plot-info-balice-773",
+        name: "Plot info",
+        visible: true,
+        geometry: {
+          kind: "label",
+          position: [labelCentroidLng, labelCentroidLat],
+          lines: [
+            `Balice ${labelParcel}`,
+            "711 m²",
+            "Maks. zabudowa 213 m² · wys. 9 m",
+          ],
+          maxVisibleDistanceM: PLOT_INFO_MAX_VISIBLE_DISTANCE_M,
+          pixelOffsetY: PLOT_INFO_PIXEL_OFFSET_Y,
+        },
+        style: {
+          color: PLOT_INFO_TEXT_COLOR,
+          backdropColor: PLOT_INFO_BACKDROP_COLOR,
+          font: PLOT_INFO_FONT,
+        },
+        source: {
+          label: "ULDK GUGiK",
+          sourceId: geometry.terytId,
+        },
       });
 
       // M2.7 — dispatch by `layer.geometry.kind` rather than calling
