@@ -132,10 +132,25 @@ export function Plot3DViewClient({
   const viewerHandleRef = useRef<ViewerActivationHandle | null>(null);
   const isActiveRef = useRef(false);
   const [isActive, setIsActive] = useState(false);
+  // M2.5-D C3 — `(pointer: coarse)` matches touchscreens / styluses;
+  // separates touch UX (large "Dotknij, aby aktywować" tap target,
+  // touch-action pan-y on the wrapper for one-finger page scroll) from
+  // the desktop mouse path. Hybrid devices with a fine pointer fall
+  // through to the desktop branch.
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 
   useEffect(() => {
     isActiveRef.current = isActive;
   }, [isActive]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsCoarsePointer(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (!cesiumMountRef.current) return;
@@ -418,27 +433,47 @@ export function Plot3DViewClient({
     };
   }, [isActive]);
 
+  // touch-pan-y on the wrapper lets a one-finger vertical swipe scroll
+  // the page when the viewer isn't activated; when the user taps the
+  // activation overlay we switch the canvas mount to touch-none so
+  // Cesium consumes every gesture (pan, two-finger pinch, two-finger
+  // rotate) without the browser also trying to interpret it as page
+  // scroll/zoom.
+  const pillCoarse =
+    "min-h-[64px] px-7 py-5 font-mono text-xs uppercase tracking-[0.2em]";
+  const pillFine =
+    "px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em]";
+
   return (
     <div
       ref={wrapperRef}
-      className="relative h-full w-full"
+      className="relative h-full w-full touch-pan-y"
       data-testid="plot3d-wrapper"
       data-active={isActive ? "true" : "false"}
+      data-pointer={isCoarsePointer ? "coarse" : "fine"}
     >
       <div
         ref={cesiumMountRef}
-        className="absolute inset-0"
+        className={`absolute inset-0 ${isActive ? "touch-none" : ""}`}
         data-testid="plot3d-cesium-container"
       />
       {!isActive && (
         <button
           type="button"
           onClick={() => setIsActive(true)}
-          className="absolute inset-0 flex cursor-pointer items-center justify-center bg-paper/30 transition-colors duration-200 hover:bg-paper/20"
-          aria-label="Aktywuj sterowanie widokiem 3D"
+          className="absolute inset-0 flex cursor-pointer touch-pan-y items-center justify-center bg-paper/30 transition-colors duration-200 hover:bg-paper/20"
+          aria-label={
+            isCoarsePointer
+              ? "Dotknij, aby aktywować sterowanie widokiem 3D"
+              : "Aktywuj sterowanie widokiem 3D"
+          }
         >
-          <span className="rounded-xs border border-line/60 bg-paper/95 px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted shadow-card">
-            Kliknij aby przesuwać
+          <span
+            className={`flex items-center rounded-xs border border-line/60 bg-paper/95 text-ink-muted shadow-card ${
+              isCoarsePointer ? pillCoarse : pillFine
+            }`}
+          >
+            {isCoarsePointer ? "Dotknij, aby aktywować" : "Kliknij aby przesuwać"}
           </span>
         </button>
       )}

@@ -460,7 +460,14 @@ function ShowcaseThreeDView({
     : title;
   return (
     <div className="space-y-3">
-      <div className="relative h-[360px] w-full sm:h-[480px]">
+      {/* M2.5-D C3 — responsive viewer height: 60vh on touch/coarse-
+          pointer devices (≤ 768 px), 50vh on desktop. Tailwind's `md:`
+          breakpoint matches the spec's `@media (max-width: 768px)`
+          cut-off (default = mobile, md: = desktop+). Pixel-based 360/
+          480 px from M2 is gone — viewport-relative sizes scale with
+          the rest of the editorial layout. Fullscreen (100vh) is
+          handled by Plot3DView via the C2 wrapper toggle. */}
+      <div className="relative h-[60vh] w-full md:h-[50vh]">
         <Plot3DView
           geometry={geometry}
           frontAzimuthDeg={geometry.frontAzimuth}
