@@ -326,6 +326,42 @@ async function generateLayerJson() {
 }
 
 /**
+ * Inject `extensions: ["octvertexnormals"]` into layer.json.
+ *
+ * ADR-0006 M2.6 — ctb-tile's `-N` flag bakes oct-encoded vertex normals into
+ * each `.terrain` binary (each vertex gains 2 octahedron-encoded bytes after
+ * the standard quantized-mesh vertex data), but the separate `ctb-tile -l`
+ * step that generates layer.json does NOT advertise that extension in the
+ * manifest. The result is that `CesiumTerrainProvider` performs an extension
+ * negotiation against the served layer.json on load — the server doesn't
+ * claim to have normals, so the provider never asks for them, even though
+ * the data is sitting in every tile. Without this fix-up Cesium can't drive
+ * `scene.globe.enableLighting` because it has no surface normals to shade
+ * against. Fixing it in the bake script means future bakes self-heal; the
+ * one-time hand-patch on the current `public/terrain-tiles/balice/layer.json`
+ * lands in the same commit so existing tiles converge immediately.
+ *
+ * Idempotent: skips when "octvertexnormals" is already present in the
+ * extensions array. Tolerates an existing extensions array with other
+ * declared extensions (e.g. a future "watermask" or "metadata") and
+ * preserves them.
+ */
+async function injectVertexNormalsExtension() {
+  const layerPath = path.join(REPO_ROOT, OUTPUT_REL, "layer.json");
+  const json = JSON.parse(await fs.readFile(layerPath, "utf8"));
+  const current = Array.isArray(json.extensions) ? json.extensions : [];
+  if (current.includes("octvertexnormals")) {
+    log("layer.json already advertises octvertexnormals — no inject needed");
+    return;
+  }
+  json.extensions = [...current, "octvertexnormals"];
+  await fs.writeFile(layerPath, JSON.stringify(json, null, 2) + "\n", "utf8");
+  log(
+    `step 5c: injected "octvertexnormals" into layer.json extensions[] (now ${json.extensions.length} entr${json.extensions.length === 1 ? "y" : "ies"})`,
+  );
+}
+
+/**
  * Trim `available[]` in layer.json to only the zoom levels we actually baked.
  *
  * tumgis/ctb-quantized-mesh emits an `available` array that extends 3 levels
@@ -421,6 +457,7 @@ async function main() {
   log("--- step 5/5: ctb-tile layer.json");
   await generateLayerJson();
   await trimLayerJsonAvailable();
+  await injectVertexNormalsExtension();
 
   const tileCount = await verify();
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
