@@ -149,6 +149,26 @@ const CONTOUR_TILES_URL =
   "/terrain-tiles/contour/balice/{z}/{x}/{y}.png";
 const CONTOUR_TILES_MAX_LEVEL = 19;
 const CONTOUR_OPACITY = 0.75;
+// ADR-0006 M2.8 C4 — slope-shading overlay derived from the same
+// NMT GRID1 1 m mosaic. Editorial 4-band palette (paper-faint /
+// moss-soft / clay-soft / clay-deep) baked by
+// `scripts/build-slope-tiles.mjs` via `gdaldem slope -p` +
+// `gdaldem color-relief`. Tile pyramid lives at
+// `/terrain-tiles/slope/balice/{z}/{x}/{y}.png`; the same
+// 404-as-transparent mechanism that bbox-restricts the contour
+// overlay also restricts this one.
+//
+// Layer alpha 0.25 is intentionally SUBORDINATE — the per-pixel
+// alpha in the bake's color table already differentiates the
+// bands (0 / 140 / 200 / 240). Layer alpha then dims the whole
+// overlay so it composites as gentle wash rather than dominant
+// imagery. Per-pixel α → band CONTRAST; layer α → overall MIX.
+// Tuning knob 0.20–0.40 if visual ack reads too faint / too
+// loud.
+const SLOPE_TILES_URL =
+  "/terrain-tiles/slope/balice/{z}/{x}/{y}.png";
+const SLOPE_TILES_MAX_LEVEL = 19;
+const SLOPE_OPACITY = 0.25;
 // ADR-0006 M2.7 C5 — plot info label visibility threshold. Hidden
 // past 2 km because the multi-line pill becomes illegible noise at
 // Małopolska-scale framing; visible inside that band where the
@@ -532,12 +552,41 @@ export function Plot3DViewClient({
         },
       });
 
+      // M2.8 C4 — slope-shading overlay (nachylenie) over plot
+      // vicinity. Pre-baked PNG pyramid from `npm run
+      // build-terrain:slope`. Registered FIRST among the raster
+      // overlays so the imagery stack reads, bottom-up: ORTO →
+      // slope wash → contour hairlines → streets navigable
+      // foreground. The polygon entity + plot info label sit
+      // above all imagery (Cesium draws entities after imagery).
+      //
+      // Layer alpha 0.25 keeps the editorial bands subordinate to
+      // the polygon as foreground subject. The per-pixel α in the
+      // bake's color table already encodes band contrast, so this
+      // layer-level dim doesn't flatten the bands — it just keeps
+      // the whole overlay's MIX subtle.
+      layerRegistry.add({
+        id: "slope-balice-773",
+        name: "Nachylenie",
+        visible: true,
+        geometry: {
+          kind: "raster",
+          urlTemplate: SLOPE_TILES_URL,
+          maximumLevel: SLOPE_TILES_MAX_LEVEL,
+        },
+        style: { color: CLAY_HEX, opacity: SLOPE_OPACITY },
+        source: {
+          label: "derived NMT GRID1 · gdaldem slope",
+          sourceId: "0-5 / 5-15 / 15-30 / 30%+ bands",
+        },
+      });
+
       // M2.8 C3 — contour-line overlay (poziomice) over plot vicinity.
       // Pre-baked PNG pyramid from `npm run build-terrain:contour`.
-      // Registered BEFORE streets so the imagery stack reads, bottom-
-      // up: ORTO → contour hairlines → streets navigable foreground.
-      // The polygon outline (Cesium entity, drawn after all imagery)
-      // and the plot info label (also an entity) stay on top.
+      // Registered AFTER slope so contour hairlines render ABOVE the
+      // slope wash, BELOW streets navigable foreground. The polygon
+      // outline (Cesium entity, drawn after all imagery) and the plot
+      // info label (also an entity) stay on top.
       // Source label distinguishes the derived bake from the source
       // NMT GRID1 already credited under the terrain plakietka row.
       layerRegistry.add({
