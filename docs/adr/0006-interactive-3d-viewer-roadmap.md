@@ -122,6 +122,35 @@ Choice deferred to M2 implementation start.
 **Provenance added:** `PZGiK NMT GRID1 · 1m × 1m`
 **Gate:** Visual ack — slope to airport visible at Balice 773; folding around Zielonki forest plot visible; slope on hillside Mogilany visible
 
+**✅ Completed 2026-05-11 — landed on Balice 773 via four atomic commits + one fix bundle on `main`:**
+- `faed583` feat(terrain): storage abstraction + env config (`src/lib/terrain/storage.ts`, tests 111 → 114)
+- `a9cccaa` feat(terrain): Docker `tumgis/ctb-quantized-mesh` bake pipeline (`scripts/build-terrain-tiles.mjs`, `npm run build-terrain`)
+- `c9b0c29` feat(3d): Cesium provider swap + provenance plakietka — `CesiumTerrainProvider.fromUrl(storage.getTilesetUrl("balice"))` with ION asset 1 → ellipsoid fallback cascade
+- `6165cda` fix(3d): five issues surfaced during the visual ack gate, bundled as a single follow-up to C3 (level-0 bake range, polygon `height: 0`, gzip `Content-Encoding` header on `.terrain` requests, `available[]` trim, and the Strefa-7 / EVRF2007 source-data correction)
+- this commit — completion note
+
+**Choice made:** Option A (Polish NMT 1m, quantized-mesh pyramid). Hybrid local-now path — tiles bake into `public/terrain-tiles/balice/` (gitignored, ~95 KB for the Balice mosaic). R2 production deploy is a single `NEXT_PUBLIC_TERRAIN_BASE_URL` flip behind `src/lib/terrain/storage.ts`, deferred to pre-launch. Phase A.5 mass replication uses the same script + a new sheet manifest per plot.
+
+**Source-data correction journey (parked here for posterity — see runbook §0 for full detail):**
+
+The F1-T0 spike (2026-05-10) selected sheet IDs `5.186.23.01/02/06/07`, claiming Balice coverage but flagging the WGS84 cross-check as `[UNVERIFIED – no gdal available]`. M2 ingestion fed those sheets through GDAL and the resulting mosaic centered at **15.26°E, 52.82°N (Pomerania)** instead of Balice (19.80°E, 50.09°N). Two compounding root causes:
+
+1. WFS BBOX axis-order trap — the runbook sent `BBOX=Xmin,Ymin,Xmax,Ymax,EPSG:2180` as geometric (E,N), but the GeoServer honours EPSG-spec axis order which for 2180 is (N,E). The Balice BBOX got interpreted as a Pomerania BBOX.
+2. Wrong WFS service — KRON86 (`NumerycznyModelTerenuKRON86/WFS/Skorowidze`) only carries `SkorowidzNMT2000`..`SkorowidzNMT2019` and lacks Strefa-7 coverage in 2019. The modern data lives on `NumerycznyModelTerenuEVRF2007/WFS/Skorowidze` (years 2018–2025), with full PL-2000:S7 coverage for Balice in 2023.
+
+Corrected: EVRF2007 service + Strefa-7 + EPSG-spec BBOX axis order → 6 verified PL-2000:S7 sheets (`7.126.10.11/12/16/17/21/22`, plot-04 centroid in `.17`). EPSG horizontal CRS bumped 2176 → 2178 in the bake script.
+
+**Verification on Balice 773:** mosaic Min 217.8 m, Max 341.3 m, StdDev 30.9 m — matches the local topography (Kraków-Balice airport runway head at ~241 m AMSL, plot plateau ~250 m, surrounding ridges into the 280–300 m range). 102 `.terrain` tiles in a healthy z15→z0 ladder. Section 05 polygon clamps onto real NMT topography; the slope to the airport reads west-of-plot in both the initial top-down and the camera-flyto views.
+
+**Parked for M2.5 / M16 (per stakeholder 2026-05-11):**
+- Terrain exaggeration / vertical drama (`Globe.terrainExaggeration`) — keeps the baseline measurement-faithful by default, M2.5 may dial in a per-plot factor
+- NMT GRID 0.5 m availability for Małopolska not yet probed — would replace `SkorowidzNMT2023` with the 0.5 m equivalent if covered
+- Explicit per-vertex normals + hillshade overlay for richer relief readability under low-zoom orthography
+- Mobile fallback (Cesium on phones eats battery; M16 toggles a "Map 2D" downgrade)
+- `layer.json` `bounds` field still defaults to the eastern hemisphere fallback `[0, -90, 180, 90]` instead of the mosaic extent — purely a request-planner efficiency hint, content geometry is correct via `available[]`. M16 post-process step.
+
+Per ADR v3 depth-first scope, only Balice 773 has a baked tileset. Plots 01–03 exercise the ION fallback in the same `Plot3DViewClient.fromUrl` → `fromIonAssetId(1)` → ellipsoid cascade and won't get Polish-NMT terrain until Phase A.5 mass replication (each plot ≈ one new sheet manifest + one `npm run build-terrain` run).
+
 ### M3 — Layer control panel UI (gateway for M4–M7) + UI mode foundation
 
 **Scope:** Editorial sidebar/overlay component in Atelier style (Fraunces section header, Instrument Sans labels, JetBrains Mono metadata, paper background, soft border). Initial state: 7 toggles, all OFF except "Ortofoto" (always-on baseline). State held in URL params (`?layers=orto,mpzp,kiut`) for shareable links. Mobile: bottom-sheet collapse pattern.
