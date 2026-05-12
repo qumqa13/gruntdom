@@ -26,6 +26,7 @@ function makeLayer(overrides: Partial<OverlayLayer> = {}): OverlayLayer {
     },
     style: overrides.style ?? { color: "#B95F3E" },
     source: overrides.source ?? { label: "ULDK GUGiK" },
+    section: overrides.section ?? "dane",
   };
 }
 

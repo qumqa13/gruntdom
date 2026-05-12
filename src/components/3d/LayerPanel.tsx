@@ -41,7 +41,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { LayerRegistry } from "@/lib/overlays/LayerRegistry";
-import type { OverlayLayer } from "@/lib/overlays/types";
+import type { LayerSectionKey, OverlayLayer } from "@/lib/overlays/types";
 
 /**
  * Polish pluralisation helper for "nakładka" with a "aktywna" agreement.
@@ -74,17 +74,53 @@ const PILL_CLASS_BASE =
 const PILL_BUTTON_CLASS = `${PILL_CLASS_BASE} cursor-pointer transition-colors duration-150 hover:bg-paper hover:text-ink-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clay/50`;
 
 /**
- * The 3-section grouping arrives in C4. C1 ships a single placeholder
- * section so the visual shape is testable while toggle wiring is
- * still parked. Order matters editorially: matches the C4 spec
- * (Dane → Otoczenie → Analiza) so the C1 ack pass can already read
- * the intended information architecture.
+ * C4 — section editorial order + titles. The order itself is the
+ * information architecture: plot-self (`dane`) reads first as the
+ * page's foreground subject, navigable context (`otoczenie`) second
+ * as anchoring, and derived analysis (`analiza`) third as
+ * interpretation built on top of the other two. Empty sections are
+ * hidden by the grouping helper so a future section key without any
+ * registered layers (e.g. M4 `"sąsiedzi"` neighbour-envelopes
+ * registered behind a Phase B feature flag) doesn't render a bare
+ * header.
  */
-const PLACEHOLDER_SECTION_TITLES = [
-  "Dane działki",
-  "Otoczenie",
-  "Analiza terenu",
-] as const;
+const SECTION_ORDER: ReadonlyArray<LayerSectionKey> = [
+  "dane",
+  "otoczenie",
+  "analiza",
+];
+const SECTION_TITLES: Record<LayerSectionKey, string> = {
+  dane: "Dane działki",
+  otoczenie: "Otoczenie",
+  analiza: "Analiza terenu",
+};
+
+/** Grouped section payload consumed by the panel's section iterator. */
+export interface LayerPanelSection {
+  readonly key: LayerSectionKey;
+  readonly title: string;
+  readonly layers: ReadonlyArray<OverlayLayer>;
+}
+
+/**
+ * Group a flat layer list into editorial-ordered sections. Pure
+ * function — exported so the C4 grouping behaviour (section order
+ * stability, empty-section filtering, per-section layer order) is
+ * unit-testable in vitest's `node` env without a DOM. Per-section
+ * layer order is the input list's insertion order (matches
+ * `LayerRegistry.getAll()`).
+ */
+export function groupLayersIntoSections(
+  layers: ReadonlyArray<OverlayLayer>,
+): LayerPanelSection[] {
+  return SECTION_ORDER
+    .map((key) => ({
+      key,
+      title: SECTION_TITLES[key],
+      layers: layers.filter((l) => l.section === key),
+    }))
+    .filter((group) => group.layers.length > 0);
+}
 
 export interface LayerPanelProps {
   /**
@@ -194,29 +230,37 @@ export function LayerPanel({ registry }: LayerPanelProps) {
             </button>
           </header>
           <div className="px-3 py-3">
-            {PLACEHOLDER_SECTION_TITLES.map((title, idx) => (
+            {/* C4 — data-driven 3-section grouping. Sections render in
+                editorial order (dane → otoczenie → analiza); empty
+                sections are filtered out upstream by
+                `groupLayersIntoSections` so a future feature-flagged
+                section without any layers doesn't render a bare
+                header. Bucket #1 editorial call: pure whitespace
+                between sections (no line divider) — the JetBrains
+                Mono headers in clay/70 are visual anchor enough, and
+                a line divider here would push the panel toward the
+                app-like control-center posture the brief rules out.
+                Row indentation: none — layers read as editorial peers
+                under their section header, alignment-matched to the
+                header's left edge. */}
+            {groupLayersIntoSections(layers).map((group, idx) => (
               <section
-                key={title}
-                className={idx > 0 ? "mt-4" : ""}
-                data-testid={`layer-panel-section-${idx}`}
+                key={group.key}
+                className={idx > 0 ? "mt-5" : ""}
+                data-testid={`layer-panel-section-${group.key}`}
               >
                 <h3 className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-clay/70">
-                  {title}
+                  {group.title}
                 </h3>
-                {/* C1 placeholder — all 6 layers stack under the
-                    first section so the visual shape is testable
-                    without committing to the C4 grouping. C4
-                    splits the rows across the three sections. */}
-                {idx === 0 &&
-                  layers.map((layer) => (
-                    <LayerRow
-                      key={layer.id}
-                      layer={layer}
-                      onToggle={() =>
-                        registry.setVisible(layer.id, !layer.visible)
-                      }
-                    />
-                  ))}
+                {group.layers.map((layer) => (
+                  <LayerRow
+                    key={layer.id}
+                    layer={layer}
+                    onToggle={() =>
+                      registry.setVisible(layer.id, !layer.visible)
+                    }
+                  />
+                ))}
               </section>
             ))}
           </div>

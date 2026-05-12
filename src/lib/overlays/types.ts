@@ -16,6 +16,22 @@
 export type LngLat = [number, number];
 
 /**
+ * ADR-0006 M3 C4 — layer-panel section affiliation.
+ *
+ * Per-layer declarative key, NOT inferred from `geometry.kind`. Phase B
+ * M10 neighbour-plot envelopes will be polygons but belong under
+ * `"otoczenie"` (or a future `"sąsiedzi"` key), not under the plot's
+ * own `"dane"` section — so a per-layer field beats an inference rule
+ * keyed off geometry shape. Same per-layer-declarative pattern as
+ * `locked` from M3 C3.
+ *
+ *   - `"dane"`     — the plot itself (granice, karta działki)
+ *   - `"otoczenie"` — navigable context (ulice, nazwy ulic)
+ *   - `"analiza"`  — derived terrain analysis (nachylenie, poziomice)
+ */
+export type LayerSectionKey = "dane" | "otoczenie" | "analiza";
+
+/**
  * Closed polygon ring in WGS84 (first vertex repeated as last). Matches
  * `PlotGeometry.boundary`; renderers strip the closing duplicate when
  * Cesium wants an open ring.
@@ -202,6 +218,13 @@ export interface OverlayLayer {
    * declarative hint, not an inferred-from-kind property.
    */
   readonly locked?: boolean;
+  /**
+   * M3 C4 — layer-panel section affiliation. Required so every
+   * registered layer lands in a deterministic section without an
+   * inference-from-`geometry.kind` fallback. See `LayerSectionKey`
+   * docstring for the per-layer-declarative rationale.
+   */
+  readonly section: LayerSectionKey;
 }
 
 /** Returned by renderers; call to remove the rendered entities. */

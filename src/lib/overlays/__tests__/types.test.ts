@@ -33,6 +33,7 @@ describe("overlays/types — discriminated union + style shape", () => {
       geometry: { kind: "polygon", boundary: ring },
       style: { color: "#B95F3E" },
       source: { label: "ULDK GUGiK", sourceId: "120616_2.0002.773" },
+      section: "dane",
     };
 
     expect(layer.geometry.kind).toBe("polygon");

@@ -95,6 +95,7 @@ function makeTilesetLayer(overrides: Partial<OverlayLayer> = {}): OverlayLayer {
     id: overrides.id ?? "buildings-balice",
     name: overrides.name ?? "Budynki",
     visible: overrides.visible ?? true,
+    section: overrides.section ?? "otoczenie",
     geometry: overrides.geometry ?? {
       kind: "tileset",
       ionAssetId: 96188,

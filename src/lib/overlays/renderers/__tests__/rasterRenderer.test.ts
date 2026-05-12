@@ -66,6 +66,7 @@ function makeRasterLayer(overrides: Partial<OverlayLayer> = {}): OverlayLayer {
     id: overrides.id ?? "streets-balice",
     name: overrides.name ?? "Ulice",
     visible: overrides.visible ?? true,
+    section: overrides.section ?? "otoczenie",
     geometry: overrides.geometry ?? {
       kind: "raster",
       urlTemplate:

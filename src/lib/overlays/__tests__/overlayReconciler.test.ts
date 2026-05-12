@@ -22,6 +22,7 @@ function polygonLayer(
     },
     style: { color: "#B95F3E" },
     source: { label: "x" },
+    section: "dane",
   };
 }
 

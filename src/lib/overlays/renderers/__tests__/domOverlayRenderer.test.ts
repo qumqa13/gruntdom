@@ -80,6 +80,7 @@ function makeLayer(overrides: Partial<OverlayLayer> = {}): OverlayLayer {
     id: overrides.id ?? "plot-info-balice-773",
     name: overrides.name ?? "Plot info",
     visible: overrides.visible ?? true,
+    section: overrides.section ?? "dane",
     geometry: overrides.geometry ?? {
       kind: "domOverlay",
       lines: [

@@ -669,6 +669,7 @@ export function Plot3DViewClient({
 
       layerRegistry.add({
         id: plotLayerIdForTerytId(geometry.terytId),
+        section: "dane",
         // M3 C3 — UI-side editorial label. The previous fallback
         // chain (`parcelLabel ?? parcelNumber ?? "działka"`) had a
         // single goal: avoid empty text in the M2.5-B inline span.
@@ -717,6 +718,7 @@ export function Plot3DViewClient({
       // the whole overlay's MIX subtle.
       layerRegistry.add({
         id: "slope-balice-773",
+        section: "analiza",
         name: "Nachylenie",
         visible: true,
         geometry: {
@@ -741,6 +743,7 @@ export function Plot3DViewClient({
       // NMT GRID1 already credited under the terrain plakietka row.
       layerRegistry.add({
         id: "contour-balice-773",
+        section: "analiza",
         name: "Poziomice",
         visible: true,
         geometry: {
@@ -765,6 +768,7 @@ export function Plot3DViewClient({
       // subdomains field — Stadia serves from a single origin.
       layerRegistry.add({
         id: "streets-balice",
+        section: "otoczenie",
         name: "Ulice",
         visible: true,
         geometry: {
@@ -788,6 +792,7 @@ export function Plot3DViewClient({
       // are wanted as a sketch.
       layerRegistry.add({
         id: "streets-labels-balice-773",
+        section: "otoczenie",
         name: "Nazwy ulic",
         visible: true,
         geometry: {
@@ -818,6 +823,7 @@ export function Plot3DViewClient({
         parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
       layerRegistry.add({
         id: "plot-info-balice-773",
+        section: "dane",
         // M3 C3 — Polish editorial rename. The English placeholder
         // "Plot info" worked for the M2.7 C5 LabelGraphics variant
         // because it never appeared in user-facing text (the

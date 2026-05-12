@@ -164,6 +164,7 @@ function polygonLayer(): OverlayLayer {
     },
     style: { color: "#B95F3E" },
     source: { label: "x" },
+    section: "dane",
   };
 }
 
@@ -178,6 +179,7 @@ function rasterLayer(): OverlayLayer {
     },
     style: { color: "#000", opacity: 0.5 },
     source: { label: "x" },
+    section: "otoczenie",
   };
 }
 
@@ -189,6 +191,7 @@ function tilesetLayer(): OverlayLayer {
     geometry: { kind: "tileset", ionAssetId: 96188 },
     style: { color: "rgba(228, 218, 196, 0.88)" },
     source: { label: "x" },
+    section: "otoczenie",
   };
 }
 
@@ -204,6 +207,7 @@ function labelLayer(): OverlayLayer {
     },
     style: { color: "#2d2a26" },
     source: { label: "x" },
+    section: "dane",
   };
 }
 
@@ -219,6 +223,7 @@ function domOverlayLayer(): OverlayLayer {
     },
     style: { color: "#15171A" },
     source: { label: "x" },
+    section: "dane",
   };
 }
 
@@ -296,6 +301,7 @@ describe("renderOverlay (dispatcher)", () => {
           },
           style: { color: "#000" },
           source: { label: "x" },
+          section: "otoczenie",
         },
         { Cesium: Cesium as never, viewer: viewer as never },
       ),
