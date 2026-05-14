@@ -9,12 +9,27 @@
  * Two states:
  *   - **Collapsed (default):** the M2.7 C6 indicator pill, now
  *     clickable. Reads "{n} {pluralized-nakładka}" and toggles the
- *     panel open on click.
- *   - **Expanded:** anchored top-left in place of the pill. Paper-
- *     toned chrome with line-toned border + soft shadow, ~280 px
- *     wide. Top row carries the pill-equivalent count + an `×`
- *     close button. Body groups layer rows into 3 editorial
- *     sections (Dane / Otoczenie / Analiza terenu, landing in C4).
+ *     panel open on click. Same top-left anchor on every viewport
+ *     — the pill is small enough that it doesn't conflict with the
+ *     mobile bottom-sheet expanded state.
+ *   - **Expanded (≥768 px / desktop, M3 C1-C5):** anchored top-left
+ *     in place of the pill. Paper-toned chrome with line-toned
+ *     border + soft shadow, ~280 px wide. Top row carries the
+ *     pill-equivalent count + an `×` close button. Body groups
+ *     layer rows into 3 editorial sections (Dane / Otoczenie /
+ *     Analiza terenu).
+ *   - **Expanded (<768 px / mobile, M3 C6):** anchored to the
+ *     bottom of the viewer container as a full-width bottom-sheet.
+ *     Top corners rounded (`rounded-t-md`), bottom flush with the
+ *     viewer edge. Capped at `max-h-[70vh]` with
+ *     `overflow-y-auto overscroll-contain` so the panel scrolls
+ *     internally without chaining into page scroll. Same chrome,
+ *     header, and section grouping as desktop — the breakpoint is
+ *     purely a positioning + sizing variant, not a content variant.
+ *     Dismissal works through the same click-outside + Escape
+ *     listeners as desktop; no separate backdrop, matching the
+ *     "informational chrome, not app-like control center"
+ *     constraint.
  *
  * Behavioural state (post-C2): row clicks call
  * `registry.setVisible(layer.id, !layer.visible)`. The same
@@ -188,10 +203,24 @@ export function LayerPanel({ registry }: LayerPanelProps) {
   // first activating the camera; below the loading overlay
   // (`z-[20]`) since layer toggling is meaningless while terrain
   // tiles are still streaming.
+  //
+  // C6 — responsive positioning. Collapsed pill anchors at top-left
+  // on every viewport. Expanded panel splits at the Tailwind `md:`
+  // breakpoint (768 px) — the same threshold the M3 brief calls
+  // out for the mobile bottom-sheet. Below 768 px the wrapper
+  // releases its top-left anchor and re-anchors to the bottom edge
+  // of the viewer container (`inset-x-0 bottom-0`); the inner card
+  // takes full width with top-rounded corners. At ≥ 768 px the
+  // `md:` overrides restore the M3 C1-C5 desktop positioning so no
+  // visual regression lands for the existing ack.
   return (
     <div
       ref={panelRef}
-      className="absolute left-3 top-3 z-[17]"
+      className={
+        isExpanded
+          ? "absolute inset-x-0 bottom-0 z-[17] md:inset-x-auto md:bottom-auto md:left-3 md:top-3"
+          : "absolute left-3 top-3 z-[17]"
+      }
       data-testid="layer-panel"
       data-state={isExpanded ? "expanded" : "collapsed"}
     >
@@ -207,8 +236,15 @@ export function LayerPanel({ registry }: LayerPanelProps) {
           {countLabel}
         </button>
       ) : (
+        // C6 — responsive card. Mobile (<768 px): full-width
+        // bottom-sheet, top corners rounded, capped at 70vh with
+        // internal scroll + overscroll-contain so the panel
+        // doesn't chain into page scroll. Desktop (≥768 px):
+        // restores the M3 C1-C5 280 px fully-rounded card. No
+        // separate mobile backdrop — click-outside + Escape are
+        // the only dismissals, consistent with the desktop branch.
         <div
-          className="w-[280px] rounded-md border border-line bg-paper shadow-card"
+          className="w-full max-h-[70vh] overflow-y-auto overscroll-contain rounded-t-md border border-line bg-paper shadow-card md:w-[280px] md:max-h-none md:overflow-visible md:rounded-md"
           role="dialog"
           aria-label="Panel nakładek"
         >
