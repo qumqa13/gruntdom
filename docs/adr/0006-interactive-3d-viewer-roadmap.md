@@ -537,16 +537,104 @@ Test suite at M2.9 close: **178/178 (+10 since M2.8 close — 9 new in `domOverl
 - **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.7 carry-forward.
 - **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.7 carry-forward.
 
-### M3 — Layer control panel UI (gateway for M4–M7) + UI mode foundation
+### M3 — Layer control panel UI (gateway for M4–M7)
 
-**Scope:** Editorial sidebar/overlay component in Atelier style (Fraunces section header, Instrument Sans labels, JetBrains Mono metadata, paper background, soft border). Initial state: 7 toggles, all OFF except "Ortofoto" (always-on baseline). State held in URL params (`?layers=orto,mpzp,kiut`) for shareable links. Mobile: bottom-sheet collapse pattern.
+**✅ Completed 2026-05-14 on Balice 773.** What was scoped at M2.9 close as "editorial sidebar/overlay with 7 toggles + URL-param state + mobile bottom-sheet" landed across seven atomic commits as a single visual ack arc with three hard gates (post-C2 reconciler fix, post-C4 grouping, post-C6 mobile). Final shape: a paper-toned editorial panel that surfaces 6 registered overlays grouped into 3 editorial sections (Dane / Otoczenie / Analiza terenu), persists user visibility decisions across page reloads, and reflows to a full-width bottom-sheet on <768 px viewports. Informational chrome, not an app-like control center.
 
-**Phase B foundation:** UI mode infrastructure — internal toggle `viewMode: "buyer" | "investor" | "developer"` plumbed through the layer panel but not yet user-visible. Default `buyer`. Sets the stage for Phase B mode-specific defaults and gated features.
+Visual ack passed end-to-end at `localhost:3000/plots/dzialka-balice-773`: the count pill reads `5 nakładek aktywnych` with correct Polish genitive-plural grammar and updates live on every toggle; the polygon row renders as a non-toggleable em-dash with `zawsze widoczne` italic disclosure (no toggle affordance, skipped by keyboard nav); sections render in fixed `dane → otoczenie → analiza` order with `Granice działki` + `Karta działki` under Dane, `Ulice` + `Nazwy ulic` under Otoczenie, and `Nachylenie` + `Poziomice` under Analiza; toggling a layer off and reloading the page leaves it off; mobile viewport renders the expanded panel as a full-width bottom-sheet anchored to the viewer's bottom edge with top corners rounded; desktop viewport renders byte-identical to the post-C4 ack state.
 
-**Time:** 4–6h (slight increase over original 3-5h due to mode plumbing)
-**Output:** Visible sidebar with 7 toggles, URL state syncs, mobile fallback works, mode state present internally
-**Provenance added:** none (UI only)
-**Gate:** Visual ack — sidebar looks like natural Atelier component, toggle interactions feel responsive, URL params propagate, mode toggle works internally even if not yet exposed in UI
+Seven commits on `main`:
+- `e747701` feat(viewer): layer panel chrome scaffolding (collapsed + expanded states) — M3 C1
+- `2614899` feat(viewer): layer panel toggle wiring via LayerRegistry — M3 C2
+- `80b3c6e` fix(viewer): propagate visibility from LayerRegistry to Cesium primitives
+- `fed42d1` feat(viewer): polygon locked state + karta działki carve-out grouping — M3 C3
+- `e12a6fb` feat(viewer): 3-section grouping in layer panel — M3 C4
+- `090d4e9` feat(viewer): layer-visibility persistence via localStorage — M3 C5
+- `8d38203` feat(viewer): mobile bottom-sheet for layer panel at <768 px — M3 C6
+- this commit — completion note
+
+#### Bucket #2 architectural decisions captured
+
+Five architectural decisions made during the M3 cycle. Each option set was framed at the start of the relevant commit; the choice + rationale captured here so M4+ extensions inherit the rationale, not just the result.
+
+1. **Section affiliation mechanism — α: per-layer declarative `section` field** (vs. β: inference from `geometry.kind`). Per-layer wins because Phase B M10 neighbour-plot envelopes will be polygons but belong under `"otoczenie"` (or a future `"sąsiedzi"` key), not under the plot's own `"dane"` section. Inference from `geometry.kind` would lock in a polygon-is-always-dane rule that the Phase B roadmap immediately breaks. Same per-layer-declarative pattern as the `locked` field from C3.
+
+2. **Locked-layer enforcement — α: panel-level UX hint via `locked?: boolean` field on `OverlayLayer`** (vs. β: registry-enforced immutability that throws on `setVisible(lockedId, false)`, γ: separate "always-on layers" list outside the registry). Picked α because the lock is the LayerPanel's contract that THIS layer is the page's foreground subject and should not be hideable through the UI — a future non-panel client (programmatic screenshot mode, a Phase B `viewMode`-default initializer) could legitimately need to flip the polygon off. Registry stays pure-data; the constraint lives at the only client it applies to.
+
+3. **Locked-row visual treatment — γ: em-dash text glyph (`—`) in `clay/50` + italic "zawsze widoczne" disclosure** (vs. α: 🔒 lock emoji, β: new SVG icon family). Picked γ because the brief's editorial DNA explicitly rules out emoji + new icon families (no shadcn / Lucide / emoji). The em-dash closes the existing dot vocabulary (●/○) with a third quiet member that reads as "fixed / line drawn through" rather than a third interactive state. No new typography or icon dependency introduced.
+
+4. **Persistence write timing — β: debounced trailing-edge write with single in-flight pending payload** (vs. α: synchronous write on every `setVisible` notify, γ: rAF-batched). Picked β with a 250 ms debounce: sub-100 ms thrashes localStorage on burst toggles; >500 ms loses state when the user navigates away mid-burst. The single-in-flight pending payload means N rapid toggles flatten to ONE trailing-edge write of the latest snapshot — coalescing was the whole point. `flush()` on unmount catches the mid-burst-then-navigate case so no toggle is silently lost.
+
+5. **Mobile layout — α: full-width bottom-sheet anchored to viewer's bottom edge** (vs. β: side drawer slide-in from left, γ: full-screen modal takeover). Picked α because the depth-first showcase posture keeps the 3D viewer as the page's foreground subject — a side drawer competes with the camera-control region, a full-screen modal hides the viewer entirely. The bottom-sheet sits below the active 3D framing without blocking it, takes full width to give the 6 toggles + 3 section headers room to breathe at mobile sizes, and uses `max-h-[70vh]` with internal scroll + `overscroll-contain` to bound its footprint and prevent scroll chaining into page scroll on iOS Safari.
+
+#### Reconciler architectural choice (between C2 and C3)
+
+Aside from the five Bucket #2 decisions above, a separate option set surfaced during the C2 visual ack when the M2.7→M2.9 one-shot `renderOverlay` dispatcher proved non-reactive — toggling a layer off in the panel updated the registry but left the Cesium primitive on the scene. Four options were considered:
+
+- α (original suggestion): re-dispatch the entire `for (const layer of getVisible()) renderOverlay(...)` loop on every `subscribe` notify. **Problem:** double-renders + leaked entities because the renderer disposers run on viewer destroy, not on re-dispatch — every notify would compound the leak.
+- β: lift `renderOverlay` results into React state and reconcile in a component. **Problem:** moves Cesium primitive ownership into React's lifecycle, breaking the M2.5-B pure-data registry invariant.
+- γ: replace registry's pure-data shape with a registry-owns-scene-state coupling. **Problem:** Phase B's 2D Leaflet client can't share the same registry; the LayerRegistry export contract from M2.5-B is broken.
+- δ (picked): keep registry pure, add a separate `overlayReconciler` subscriber that diffs the layer list against a live disposer Map on every mutation. Toggle off calls the layer's disposer; toggle on re-renders.
+
+δ was picked over the α suggestion because it preserves the M2.5-B invariant ("`LayerRegistry` has no Cesium / DOM / React dependency" — see *Foundation patterns captured for future overlays*, M2.5-B section). The reconciler is the only Cesium-aware piece in the chain; the registry stays portable. **Architectural lesson worth preserving:** when a reactivity gap surfaces between a pure-data layer and an imperative downstream consumer, the right answer is often a new subscriber, not a new coupling — adding a third actor preserves the boundaries the existing two actors guard.
+
+#### C1 — Panel chrome scaffolding (collapsed + expanded states)
+
+`e747701`. New file `src/components/3d/LayerPanel.tsx` with the collapsed pill (clickable variant of the M2.7 C6 indicator) + expanded card chrome anchored top-left at `z-[17]` (above the M2.5-D activation gate at `z-[15]` and reset button at `z-[16]`, below the loading overlay at `z-[20]`). The `pluralizeNakladka` helper covers Polish tri-form agreement (`nakładka aktywna` / `nakładki aktywne` / `nakładek aktywnych`) with the 12-14 carve-out from the standard pl-PL rules; unit-testable in vitest `node` env without DOM. Initial expanded body uses placeholder section titles and stacks all rows under the first section — C4 lands the data-driven grouping.
+
+#### C2 — Toggle wiring via LayerRegistry.setVisible
+
+`2614899`. Row click handler calls `registry.setVisible(layer.id, !layer.visible)`. The component subscribes to the same `subscribe` channel that drives the count display, so the write path and the read path share a single round-trip through the registry — no local React state mirrors visibility at the row level. `aria-pressed` carries the toggle semantic; `aria-label` composes the layer name with a Polish status hint (`widoczne` / `ukryte`) so assistive-tech announcement is self-explanatory without the visual glyph (●/○).
+
+#### Reconciler fix (between C2 and C3)
+
+`80b3c6e`. Per the δ-option rationale above. New file `src/lib/overlays/overlayReconciler.ts` owns a `Map<layerId, OverlayDisposer>` and diffs against the registry's `getAll()` on every notify. The reconciler subscribes BEFORE the initial `add()` calls in `Plot3DViewClient.tsx`'s mount IIFE so each `add()` renders incrementally — same total cost as the M2.7-M2.9 one-shot loop, plus reactive on every subsequent mutation.
+
+#### C3 — Polygon locked invariant + karta działki carve-out
+
+`fed42d1`. Adds `readonly locked?: boolean` to `OverlayLayer`. The plot polygon registers with `locked: true` and renders as a `<div>` (not button) with em-dash glyph, `aria-disabled`, `tabIndex={-1}` — keyboard nav skips the row. Also rewrites the plot info DOM overlay's layer name from `"Plot info"` (English placeholder, never user-facing under M2.9's LabelGraphics variant) to `"Karta działki"` so the layer name reads as a Polish editorial peer alongside `Granice działki` / `Ulice` / `Poziomice`. Visual ack PASS 2026-05-12 ("jest ok, na dzisiaj kończymy").
+
+#### C4 — Data-driven 3-section grouping
+
+`e12a6fb`. Adds `LayerSectionKey = "dane" | "otoczenie" | "analiza"` to `src/lib/overlays/types.ts` + `readonly section: LayerSectionKey` to `OverlayLayer`. Every layer registration in `Plot3DViewClient.tsx` declares its section explicitly. New `groupLayersIntoSections` helper buckets layers by section, emits sections in fixed editorial order (dane → otoczenie → analiza), and filters out empty sections so a future feature-flagged section without any registered layers doesn't render a bare header. Section order IS the information architecture: plot-self reads first as foreground subject, navigable context second as anchoring, derived analysis third as interpretation built on top. Visual ack PASS 2026-05-14 ("poza tym ok, lecimy dalej").
+
+#### C5 — localStorage persistence with polygon exclusion
+
+`090d4e9`. New module `src/lib/overlays/layerVisibilityPersistence.ts` covers SSR-safe read/write, versioned `plotview-layer-visibility-v1` key (loader's strict shape check on cross-version reads falls back to defaults rather than crashing), defensive shape filter that drops non-boolean entries on read, and `createDebouncedVisibilitySaver` with `schedule` / `flush` / `cancel` surface. `snapshotVisibility` excludes locked layers from the persisted payload so the polygon's always-on contract never lands in storage; `resolveInitialVisibility` force-defaults locked layers on the read path so a stale entry from an older schema can't hide the page's foreground subject. The lock contract overrides persistence on both directions. Wired into `Plot3DViewClient.tsx` so the saver subscribes AFTER initial `add()` calls (boot-time population doesn't itself write a snapshot back) and the cleanup disposer unsubscribes-then-flushes synchronously before viewer destroy — a mid-burst toggle landed within the 250 ms debounce window still persists.
+
+#### C6 — Mobile bottom-sheet at <768 px
+
+`8d38203`. LayerPanel's expanded state splits at the Tailwind default `md:` breakpoint (768 px — matches the M3 brief's mobile cutoff exactly; no `screens` override in `tailwind.config.ts`). Below 768 px the wrapper releases its top-left anchor and re-anchors to `absolute inset-x-0 bottom-0` as a full-width bottom-sheet, `rounded-t-md` top corners, `max-h-[70vh] overflow-y-auto overscroll-contain` to bound the footprint and prevent scroll chaining into page scroll on iOS Safari. The `md:` overrides restore the M3 C1-C5 desktop positioning byte-identical — visual regression at ≥768 px is zero by construction. No mobile backdrop, no drag handle, no slide-up animation: the brief's editorial DNA rules out glassmorphism / bouncy springs / new icon families, and the "informational chrome, not app-like control center" posture makes modal-style affordances feel off-register. Visual ack PASS 2026-05-14.
+
+#### Visual ack — 2026-05-14 (end-to-end)
+
+Stakeholder confirmed across the full M3 stack:
+- Count pill reads `5 nakładek aktywnych` (n=5 because the polygon's `Granice działki` is locked + excluded from the visible-count) with the correct Polish genitive-plural branch.
+- Polygon row renders as em-dash + `zawsze widoczne` italic disclosure; click + tab both skip the row.
+- 3 sections render in `dane → otoczenie → analiza` order with the correct layer membership per section (polygon + karta działki under Dane; ulice + nazwy ulic under Otoczenie; nachylenie + poziomice under Analiza).
+- Toggling a layer off, reloading the page (and navigating away + returning), leaves the layer off; toggling all layers off leaves the count pill at `0 nakładek aktywnych` (n=0 genitive branch).
+- Mobile viewport (<768 px) renders the expanded panel as a full-width bottom-sheet anchored to the viewer's bottom edge; desktop viewport (≥768 px) renders unchanged from the post-C4 ack state.
+- 7-row plakietka unchanged — provenance is a separate concern from layer toggling; the M2.9 plakietka caption stack survives M3 intact.
+
+Test suite at M3 close: **220/220 (+42 since M2.9 close — 21 new in `layerVisibilityPersistence.test.ts` covering SSR path, malformed-payload defenses, locked-layer carve-outs on both directions, debounced saver semantics with `vi.useFakeTimers`; the remaining 21 spread across `LayerPanel.test.ts` (pluralization tri-form + `groupLayersIntoSections` invariants) and `overlayReconciler.test.ts` (add/remove/toggle/clear reconciliation with disposer ownership)).** tsc + lint clean.
+
+**Active layer census at M3 close (unchanged from M2.9):**
+- 6 layer instances registered, 3 active renderer kinds (raster=4: slope + contour + streets lines + streets labels; polygon=1: plot-balice-773 locked; domOverlay=1: plot-info-balice-773).
+- 1 layer is locked (`Granice działki`) and rendered as a non-toggleable em-dash row; 5 are user-toggleable, so the count pill caps at `5 nakładek aktywnych`.
+- localStorage payload at full default state is empty `{}` because all 5 unlocked layers boot to `visible: true` and `snapshotVisibility` only writes after a user toggle. First user toggle writes a singleton record (e.g. `{"slope-balice-773": false}`); subsequent toggles update the same payload in place.
+
+#### Parked for M4 / M16 / Phase B (carry-forward post-M3)
+
+- **M4 next milestone** — street view, primary path Cesium first-person camera mode (Path B), failover Path A is a Google Street View link fallback button. Starts immediately after this completion note lands. Foundation requirement: re-use the M2.5-D activation pattern for first-person mode entry (click-to-activate, ESC to exit).
+- **M5+ utility-network layers ("Uzbrojenie terenu" section)** — standalone milestone, 6 utility categories (wodociągi, energetyka, kanalizacja, gaz, ciepłownictwo, telekomunikacja) sourcing from Geoportal.gov.pl + emapa.gov.pl WFS/WMS endpoints. Will extend `LayerSectionKey` with a fourth member (`"uzbrojenie"`) — the foundation in C4 is already designed for additive section keys without churning the grouping helper.
+- **Fullscreen-mode 2D map fragment bug** — flagged on M3 C4 ack 2026-05-14 ("CartoDB tiles + scale bar visible top-center w fullscreen view"). Likely a 2D context map / locator overlay bleeding through into the fullscreen context at the wrong z-stack position. Parked as **M3.5 or M4 cleanup pass** per stakeholder direction; not in M3 scope.
+- **URL-param `?layers=...` shareable state** — deferred from the M3 brief's original scope. The persistence layer covers the same UX surface (a returning user finds their toggles intact) without surfacing URL state; explicit URL-param state can land alongside the M4 street-view-share-link work where view position + active layers form a single shareable payload.
+- **Phase B `viewMode` plumbing** — deferred from the M3 brief's original "Phase B foundation" scope. The mode infrastructure was not implemented in M3; defer to the Phase B milestone where the toggle becomes user-facing (per `M12 — Multi-mode UI (viewer modes)` in this ADR). Reason: the persistence layer landed in M3 covers visibility state only; mode state belongs to a separate persistence key and a separate provider context that M12 will define from a position of knowing the full mode-defaults surface, rather than M3 having to invent it speculatively.
+- **Vector-tile recolor for "Atelier ink streets"** — still parked from M2.9; queues after M4 or under Phase B premium tier.
+- **Production API key handling for Stadia Maps** — still parked from M2.9; the M3 panel's per-layer config shape is ready when the production deploy needs per-environment tile origins.
+- **Per-line typography in `DomOverlayGeometry`** — still parked from M2.9.
+- **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.9 carry-forward.
+- **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.9 carry-forward.
 
 ### M4 — MPZP layer (first thematic overlay, 2D version)
 
