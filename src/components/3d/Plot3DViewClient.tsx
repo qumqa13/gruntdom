@@ -24,6 +24,12 @@ import { useEffect, useRef, useState } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
+import {
+  createDebouncedVisibilitySaver,
+  loadLayerVisibility,
+  resolveInitialVisibility,
+  snapshotVisibility,
+} from "@/lib/overlays/layerVisibilityPersistence";
 import { createOverlayReconciler } from "@/lib/overlays/overlayReconciler";
 import { plotLayerIdForTerytId } from "@/lib/overlays/plotLayerId";
 import { renderOverlay } from "@/lib/overlays/renderOverlay";
@@ -667,8 +673,19 @@ export function Plot3DViewClient({
       overlayDisposers.push(unsubscribeReconciler);
       overlayDisposers.push(() => overlayReconciler.disposeAll());
 
+      // M3 C5 — read persisted layer visibility ONCE before the
+      // initial add() calls. Each subsequent add() resolves its
+      // initial `visible` flag through resolveInitialVisibility so
+      // the user's prior toggles survive page reloads. Reading here
+      // (not later, then toggling each layer post-init) keeps the
+      // boot path quiet — the reconciler dispatches one render per
+      // layer that's actually visible, and we don't pay the cost of
+      // dispose+re-render for layers the user had hidden.
+      const persistedVisibility = loadLayerVisibility();
+
+      const polygonLayerId = plotLayerIdForTerytId(geometry.terytId);
       layerRegistry.add({
-        id: plotLayerIdForTerytId(geometry.terytId),
+        id: polygonLayerId,
         section: "dane",
         // M3 C3 — UI-side editorial label. The previous fallback
         // chain (`parcelLabel ?? parcelNumber ?? "działka"`) had a
@@ -681,7 +698,17 @@ export function Plot3DViewClient({
         // info card heading ("Balice DZIAŁKA 773") and the
         // plakietka attribution row.
         name: "Granice działki",
-        visible: true,
+        // M3 C5 — locked layers always boot to their default
+        // visibility regardless of any persisted value: the lock
+        // contract overrides persistence so a stale entry from an
+        // older schema can't silently hide the page's foreground
+        // subject. The polygon's default is `true`.
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          polygonLayerId,
+          true,
+          true,
+        ),
         // M3 C3 — locked / always-on. The polygon is the page's
         // foreground subject; LayerPanel renders it as a non-
         // toggleable row with a "zawsze widoczne" disclosure.
@@ -720,7 +747,11 @@ export function Plot3DViewClient({
         id: "slope-balice-773",
         section: "analiza",
         name: "Nachylenie",
-        visible: true,
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          "slope-balice-773",
+          true,
+        ),
         geometry: {
           kind: "raster",
           urlTemplate: SLOPE_TILES_URL,
@@ -745,7 +776,11 @@ export function Plot3DViewClient({
         id: "contour-balice-773",
         section: "analiza",
         name: "Poziomice",
-        visible: true,
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          "contour-balice-773",
+          true,
+        ),
         geometry: {
           kind: "raster",
           urlTemplate: CONTOUR_TILES_URL,
@@ -770,7 +805,11 @@ export function Plot3DViewClient({
         id: "streets-balice",
         section: "otoczenie",
         name: "Ulice",
-        visible: true,
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          "streets-balice",
+          true,
+        ),
         geometry: {
           kind: "raster",
           urlTemplate: STAMEN_STREETS_URL,
@@ -794,7 +833,11 @@ export function Plot3DViewClient({
         id: "streets-labels-balice-773",
         section: "otoczenie",
         name: "Nazwy ulic",
-        visible: true,
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          "streets-labels-balice-773",
+          true,
+        ),
         geometry: {
           kind: "raster",
           urlTemplate: STAMEN_LABELS_URL,
@@ -821,8 +864,9 @@ export function Plot3DViewClient({
       // them through a per-plot data binding alongside the polygon.
       const labelParcel =
         parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
+      const plotInfoLayerId = "plot-info-balice-773";
       layerRegistry.add({
-        id: "plot-info-balice-773",
+        id: plotInfoLayerId,
         section: "dane",
         // M3 C3 — Polish editorial rename. The English placeholder
         // "Plot info" worked for the M2.7 C5 LabelGraphics variant
@@ -834,7 +878,11 @@ export function Plot3DViewClient({
         // gap. "Karta działki" reads as the editorial peer the
         // brief calls out.
         name: "Karta działki",
-        visible: true,
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          plotInfoLayerId,
+          true,
+        ),
         geometry: {
           kind: "domOverlay",
           lines: [
@@ -875,6 +923,25 @@ export function Plot3DViewClient({
       // the disposer Map). Toggle off / toggle on now flows through
       // the same path, which is what makes the M3 panel actually
       // affect the scene.
+
+      // M3 C5 — debounced visibility saver. Subscribes AFTER the
+      // initial add() calls so the boot-time population doesn't
+      // itself write a snapshot back to storage on the next tick;
+      // only user-driven toggles (or future programmatic mutations
+      // from M4+ thematic layers) feed the saver. The disposer
+      // unsubscribes first so no further schedule() calls fire on
+      // teardown, then flush()es any pending write synchronously —
+      // a mid-burst toggle landed inside the 250 ms debounce window
+      // still persists when the user navigates away.
+      const visibilitySaver = createDebouncedVisibilitySaver();
+      const unsubscribeVisibilitySaver = layerRegistry.subscribe(() => {
+        if (disposed) return;
+        visibilitySaver.schedule(snapshotVisibility(layerRegistry.getAll()));
+      });
+      overlayDisposers.push(() => {
+        unsubscribeVisibilitySaver();
+        visibilitySaver.flush();
+      });
 
       // M3 C1 — publish the registry instance to component state so
       // LayerPanel can subscribe to it. Done AFTER the initial `add()`
