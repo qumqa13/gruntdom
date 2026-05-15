@@ -78,3 +78,9 @@ public/nmt/*.xyz.zip
 # Dev path serves them as Next.js static assets; production targets Cloudflare
 # R2 + CDN via NEXT_PUBLIC_TERRAIN_BASE_URL. Never commit the bake outputs.
 public/terrain-tiles/
+
+# Claude Code local settings
+.claude/
+
+# Claude Code local settings
+.claude/
