@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
+import { ZOOM_FACTOR } from "@/lib/3d/cameraConstants";
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
 import {
   createDebouncedVisibilitySaver,
@@ -581,6 +582,24 @@ export function Plot3DViewClient({
       // actually reach Cesium (i.e. post-activation). See
       // WHEEL_INERTIA_ZOOM rationale for the value choice.
       v.scene.screenSpaceCameraController.inertiaZoom = WHEEL_INERTIA_ZOOM;
+      // M3.5 C1 — per-wheel-notch zoom step. Companion to the M2.5-E
+      // inertia tuning: where `inertiaZoom` controls how the zoom
+      // velocity DECAYS, `_zoomFactor` controls how big each notch's
+      // velocity SPIKE is. Cesium's internal default is 5.0 — the
+      // step dominates the eye over the smoothed decay, which reads
+      // as "jumpy" even at the M2.5-E-tuned 0.93 inertia. Cutting it
+      // to 1.75 (~35% of default) gives a Google-Maps-satellite-feel
+      // gradual zoom where each notch is a controlled increment. The
+      // field is private on Cesium's controller (no public TypeScript
+      // surface in 1.141), so we cast to a structural type just for
+      // the assignment — the runtime field exists and is read by the
+      // controller every wheel event. Tuning rationale + range knob
+      // live in `src/lib/3d/cameraConstants.ts`.
+      (
+        v.scene.screenSpaceCameraController as unknown as {
+          _zoomFactor: number;
+        }
+      )._zoomFactor = ZOOM_FACTOR;
       // M2.9 C1 — zoom-out hard cap. Clamps wheel + middle-click zoom
       // before the floating-mesa LOD seam between the GRID1 bake and
       // Cesium World Terrain surround enters the frame. See
