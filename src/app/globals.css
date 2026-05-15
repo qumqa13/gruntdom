@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ADR-0006 M3.5 C2 — hide bleed-through siblings while the 3D
+   viewer's CSS-only fullscreen modal is active. The class pair
+   is exported from `src/lib/3d/fullscreenState.ts` so the JS
+   side (Plot3DView toggles body class; PlotMap wears the hide
+   marker) and this CSS rule stay in sync via a single source
+   of truth. Tight selector — only elements explicitly opted-in
+   via `plot3d-fullscreen-hide` are affected. */
+body.plot3d-fullscreen .plot3d-fullscreen-hide {
+  display: none;
+}
+
 @layer base {
   :root {
     color-scheme: light;

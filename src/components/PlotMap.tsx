@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import type { PlotGeometry } from "@/types/plot";
+import { PLOT3D_FULLSCREEN_HIDE_CLASS } from "@/lib/3d/fullscreenState";
 import { MapModal } from "./MapModal";
 
 const PlotMapClient = dynamic(() => import("./PlotMapClient"), {
@@ -28,7 +29,17 @@ export function PlotMap({ geometry, label, title, location }: PlotMapProps) {
 
   return (
     <>
-      <div className="h-[280px] w-full sm:h-[420px]">
+      {/* M3.5 C2 — wears `plot3d-fullscreen-hide` so the
+          Leaflet panes (scale bar + zoom controls in particular,
+          which Leaflet positions with `position: fixed`) don't
+          bleed through into the 3D viewer's CSS-only fullscreen
+          modal. The class is joined to the body's
+          `plot3d-fullscreen` class by a single globals.css rule;
+          shape is `display: none` so layout collapses cleanly
+          without leaving an empty 280-420 px gap. */}
+      <div
+        className={`h-[280px] w-full sm:h-[420px] ${PLOT3D_FULLSCREEN_HIDE_CLASS}`}
+      >
         <PlotMapClient
           geometry={geometry}
           label={label}

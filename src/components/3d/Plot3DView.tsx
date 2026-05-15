@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Suspense, useEffect, useState } from "react";
 
+import { PLOT3D_FULLSCREEN_BODY_CLASS } from "@/lib/3d/fullscreenState";
 import type { PlotGeometry } from "@/types/plot";
 
 const Plot3DViewClient = dynamic(
@@ -39,12 +40,19 @@ export function Plot3DView(props: Plot3DViewProps) {
 
   // Body scroll lock while the modal is open. Snapshot the previous
   // overflow value so we restore (not blank) whatever the page had set.
+  // M3.5 C2 — also toggle the `plot3d-fullscreen` body class so
+  // siblings whose internal stacking-context escapes the modal's
+  // z-[100] wrapper (the 2D PlotMap's Leaflet panes have
+  // `position: fixed` for the scale bar / attribution / zoom
+  // controls) can hide themselves via the globals.css rule.
   useEffect(() => {
     if (!isFullscreen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.body.classList.add(PLOT3D_FULLSCREEN_BODY_CLASS);
     return () => {
       document.body.style.overflow = previous;
+      document.body.classList.remove(PLOT3D_FULLSCREEN_BODY_CLASS);
     };
   }, [isFullscreen]);
 
