@@ -1,6 +1,6 @@
 # Current State
 
-*Stan na: maj 2026 · M3 closed · 4 commits pending push*
+*Stan na: maj 2026 · M3 closed + M3.5 polish pass landed · commits pending stakeholder push*
 
 Concise snapshot dla quick onboarding nowych uczestników (designers / devs / inwestorzy). Dla pełnej dokumentacji produktowej → [`PRODUCT.md`](PRODUCT.md). Dla roadmap forward → [`ROADMAP.md`](ROADMAP.md).
 
@@ -20,6 +20,7 @@ Plotview to platforma listingowa działek budowlanych z wbudowanym modułem anal
 - **Imagery base:** ortofoto Geoportal · StandardResolution (25-50 cm/piksel)
 - **Imagery overlays:** Stamen Toner Lines + Stamen Toner Labels (Stadia Maps)
 - **Camera constraints:** zoom 5 km cap (M2.9 C1), pan rubber-band 3 km rim (M2.9 C2)
+- **Wheel-zoom ergonomics:** per-notch step `_zoomFactor = 1.75` (M3.5 C1, ~35% of Cesium default 5.0) + decay `inertiaZoom = 0.93` (M2.5-E C2). Google-Maps-satellite-feel controlled increment, NOT jumpy
 - **Lighting:** sun + NW rake light directional (M2.6)
 - **Polygon overlay:** clay-toned ULDK GUGiK boundary, terrain-draped, lock-status invariant
 - **DOM overlay:** Karta działki anchored bottom-right (Balice DZIAŁKA 773 / 711 m² / Maks. zabudowa 213 m² · wys. 9 m)
@@ -129,7 +130,7 @@ git push origin main
 
 ## Test suite
 
-**220/220 passing** (vitest + tsc + lint clean).
+**227/227 passing** (vitest + tsc + lint clean).
 
 Coverage breakdown:
 - LayerRegistry (M2.5-B): 11 tests
@@ -155,7 +156,8 @@ Coverage breakdown:
 
 ### M3.5 / M4 cleanup
 
-- Fullscreen mode 2D map fragment bug (CartoDB tiles + scale bar bleeding through fullscreen at wrong position)
+- ✅ ~~Fullscreen mode 2D map fragment bug~~ — resolved 2026-05-15 (M3.5 C2; body class + global CSS hide rule joined via stable class-name constants in `src/lib/3d/fullscreenState.ts`)
+- ✅ ~~Wheel-zoom step too aggressive at M2.5-E-tuned 0.93 inertia~~ — resolved 2026-05-15 (M3.5 C1; `_zoomFactor = 1.75` per-notch step reduction)
 
 ### M4 (next milestone)
 

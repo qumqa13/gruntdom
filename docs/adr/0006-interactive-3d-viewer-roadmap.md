@@ -636,6 +636,60 @@ Test suite at M3 close: **220/220 (+42 since M2.9 close — 21 new in `layerVisi
 - **Mobile fallback to 2D** — still parked under M16. Unchanged from M2.9 carry-forward.
 - **`layer.json` `bounds` post-process** — still parked under M16. Unchanged from M2.9 carry-forward.
 
+### M3.5 — Viewer polish pass (scroll sensitivity + fullscreen artifact)
+
+**✅ Completed 2026-05-15 on Balice 773.** Mini-milestone cleanup pass between M3 close and M4. Two standalone bugfixes the stakeholder flagged on the M3 visual ack arc landed across two atomic commits + this docs note, sized for a 1.5–2.5h session rather than a full milestone. M3.5 is not a roadmap shift — it's the M3 carry-forward bucket's "Fullscreen mode 2D map fragment bug" line ticked off plus the M2.5-E C2 comment's forecast tuning-knob drop ("if 0.93 reads jumpy, drop the per-notch zoom factor as a second-pass mitigation").
+
+Visual ack pass pending end-to-end stakeholder confirmation at `localhost:3000/plots/dzialka-balice-773` across two gates:
+- post-C1: wheel zoom + trackpad pinch read as "controlled" rather than "jumpy" — comparable to Google Maps satellite default behaviour.
+- post-C2: enter fullscreen on the 3D viewer → 2D PlotMap no longer visible AND no Leaflet panes (scale bar / zoom controls / attribution) bleeding through at wrong positions; exit fullscreen → PlotMap restored.
+
+Three commits on `main`:
+- `c113a89` feat(viewer): reduce wheel-zoom step to Google-Maps-feel — M3.5 C1
+- `61e76a2` fix(viewer): hide 2D PlotMap when 3D viewer is fullscreen — M3.5 C2
+- this commit — completion note + CURRENT_STATE backlog clear
+
+#### C1 — Per-wheel-notch zoom step reduction
+
+`c113a89`. New pure module `src/lib/3d/cameraConstants.ts` with the tunable + a regression test. The M2.5-E C2 comment explicitly forecast this commit ("if 0.93 still reads jumpy after visual ack, drop the per-notch zoom factor (private `_zoomFactor`) by ~50% as a second-pass mitigation"); stakeholder visual ack flagged the predicted state. Two wheel-zoom knobs control different parts of the feel:
+- `inertiaZoom` (M2.5-E, unchanged at 0.93): how fast the zoom velocity DECAYS after each notch.
+- `_zoomFactor` (M3.5, set to 1.75): how big each notch's velocity SPIKE is.
+
+M2.5-E tuned decay correctly; M3.5 tunes step size. The eye reads the pair as a smooth gradual zoom where each notch is a controlled increment — Google-Maps-satellite feel.
+
+`_zoomFactor` is private on Cesium 1.141's `ScreenSpaceCameraController` (no public TypeScript surface), so the assignment casts through a structural `{ _zoomFactor: number }` shape — the runtime field exists and is read by the controller every wheel event. Bucket #1 tuning knob 1.0–2.5; below 1.0 the wheel feels sticky / slow, above 2.5 the jumpiness comes back. Regression test pins the literal value (1.75) + the strict-below-Cesium-default invariant (< 5.0) + the 1.0–2.5 comfort range, so future tuning passes can't accidentally drift back into jumpy territory.
+
+#### C2 — Fullscreen 2D PlotMap bleed-through fix
+
+`61e76a2`. Root cause: the 3D viewer's CSS-only fullscreen modal (`fixed inset-0 z-[100]` on the wrapper — kept CSS rather than the browser Fullscreen API to avoid an unmount/remount cycle that would lose Cesium camera state, see Plot3DView.tsx) creates a new stacking context, but Leaflet's internal panes use their own `position: fixed` for the scale bar / zoom controls / attribution and escape the modal's stacking context. The fixed panes render at their original viewport positions, on top of the fullscreen modal.
+
+Three narrow touchpoints + one global CSS rule, joined by a single pair of stable class-name constants in `src/lib/3d/fullscreenState.ts`:
+
+- `PLOT3D_FULLSCREEN_BODY_CLASS = "plot3d-fullscreen"` — applied to `document.body` by Plot3DView while `isFullscreen` is true (extends the existing body-scroll-lock useEffect; same lifecycle seam, no new state).
+- `PLOT3D_FULLSCREEN_HIDE_CLASS = "plot3d-fullscreen-hide"` — marker class on siblings that should hide while the viewer is modal-on-top. PlotMap's root container wears the marker — its own Leaflet child is the bleed-through source.
+- globals.css join rule `body.plot3d-fullscreen .plot3d-fullscreen-hide { display: none; }` — tight descendant-combinator selector; only elements explicitly opted-in via the marker class are affected. Future bleed-through-prone siblings can opt-in by adding the same marker class without touching the JS toggle or the CSS rule.
+
+Why body class + CSS over a React Context or a window event: the plot detail page is a server component and can't hold the fullscreen state to thread through props; a Context provider would force wrapping the entire page in a client component just to coordinate two siblings. Body class + CSS keeps React state ownership inside the single component (Plot3DView) that already owns it, with one global CSS rule as the join.
+
+`display: none` (not `visibility: hidden`) is the chosen shape so layout collapses cleanly — leaving a 280–420 px gap where the PlotMap would have been would visually misrepresent the fullscreen modal's coverage.
+
+#### Visual ack — pending end-to-end (2026-05-15)
+
+Awaiting stakeholder confirmation across the two gates listed above.
+
+Test suite at M3.5 close: **227/227 (+7 since M3 close — 4 in `cameraConstants.test.ts` covering the literal ZOOM_FACTOR value + the strict-below-Cesium-default invariant + the 1.0–2.5 comfort range; 3 in `fullscreenState.test.ts` covering both class-name literals + a not-equal sanity guard against the descendant combinator self-matching).** tsc clean.
+
+**Active surfaces unchanged from M3 close:**
+- 6 LayerPanel-registered overlays (same census as M3).
+- Camera envelope (M2.9 C1 zoom cap + C2 pan rubber-band) unchanged.
+- M3.5 doesn't add a new layer, new mode, or new UI surface — pure ergonomics polish.
+
+#### Parked for M4 / M16 / Phase B (carry-forward post-M3.5)
+
+- All prior M3 carry-forward items remain — same list as post-M3 close.
+- One backlog item ticked off: the "Fullscreen mode 2D map fragment bug" line from the M3 carry-forward + `docs/CURRENT_STATE.md` § "M3.5 / M4 cleanup" is now resolved by C2.
+- The M2.5-E C2 comment's forecasted second-pass tuning is now resolved by C1 — no longer "if 0.93 reads jumpy, drop _zoomFactor"; the drop happened.
+
 ### M4 — MPZP layer (first thematic overlay, 2D version)
 
 **Scope:** Connect "MPZP" toggle from M3 to `KIMPZP` WMS service. Render as semi-transparent (40% alpha) imagery layer overlaid on orto. Display gmina's MPZP zones (mieszkalna, usługowa, zielona, drogowa) with authoritative color coding. Tap on zone → popup with zone code + link to gmina's source document.
