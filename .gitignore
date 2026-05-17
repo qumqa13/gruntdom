@@ -82,5 +82,9 @@ public/terrain-tiles/
 # Claude Code local settings
 .claude/
 
-# Claude Code local settings
-.claude/
+# ADR-0006 M6 C1 — NMT elevation rasters per plot. Each plot bake is a
+# small GeoTIFF + metadata.json + statistics.json sidecar. Gitignored by
+# default for scaling (Phase A.5 mass replication will produce many plot
+# rasters; only showcase plots stay tracked via the negation rule below).
+data/nmt/*
+!data/nmt/dzialka-balice-773/
