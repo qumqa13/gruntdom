@@ -124,6 +124,29 @@ export interface DomOverlayGeometry {
    * narrow viewports tighten via `clamp(12px, 2vw, insetPx)`. Default 24.
    */
   readonly insetPx?: number;
+  /**
+   * ADR-0006 M6 C4 — optional terrain analysis block appended to the
+   * card under the `lines` array. Rendered as a divider + section
+   * header (mono small-caps) + key/value rows. Used by Karta działki
+   * to surface elevation statistics (range, delta, avg/max slope,
+   * std-dev) once the M6 NMT raster has loaded. Absent / undefined
+   * when the raster hasn't been built for this plot — the card
+   * silently degrades to just the `lines` block, no visible gap.
+   */
+  readonly terrainStats?: TerrainStatsBlock;
+}
+
+/** ADR-0006 M6 C4 — DOM overlay terrain analysis block. */
+export interface TerrainStatsBlock {
+  /** Section header text (e.g. `"Analiza terenu"`). */
+  readonly headerText: string;
+  /** Key/value rows; pre-formatted strings (Polish locale, units included). */
+  readonly rows: ReadonlyArray<TerrainStatsRow>;
+}
+
+export interface TerrainStatsRow {
+  readonly label: string;
+  readonly value: string;
 }
 
 /**

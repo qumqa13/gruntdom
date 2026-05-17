@@ -228,4 +228,79 @@ describe("renderDomOverlay", () => {
       ),
     ).toThrowError(/expected domOverlay geometry, got "tileset"/);
   });
+
+  // M6 C4 — terrain analysis block extension.
+  describe("terrainStats block", () => {
+    it("does not render the block when terrainStats is undefined", () => {
+      const env = makeMockEnv();
+      renderDomOverlay(makeLayer(), {
+        Cesium: env.Cesium as never,
+        viewer: env.viewer as never,
+      });
+      // Only the 3 `lines` paragraphs land — no divider, no header,
+      // no stat rows.
+      expect(env.created[0]?.children).toHaveLength(3);
+    });
+
+    it("renders divider + header + per-row label/value when present", () => {
+      const env = makeMockEnv();
+      renderDomOverlay(
+        makeLayer({
+          geometry: {
+            kind: "domOverlay",
+            lines: ["Balice DZIAŁKA 773", "711 m²", "Maks. zabudowa 213 m²"],
+            anchor: "bottom-right",
+            terrainStats: {
+              headerText: "Analiza terenu",
+              rows: [
+                { label: "Wysokość", value: "234,1 — 245,0 m n.p.m." },
+                { label: "Delta", value: "10,9 m" },
+                { label: "Średni spadek", value: "8,3%" },
+              ],
+            },
+          },
+        }),
+        { Cesium: env.Cesium as never, viewer: env.viewer as never },
+      );
+      const aside = env.created[0]!;
+      // 3 lines + 1 divider + 1 header + 3 row paragraphs = 8 children.
+      expect(aside.children).toHaveLength(3 + 1 + 1 + 3);
+
+      // 4th child = divider (div with background).
+      const divider = aside.children[3];
+      expect(divider?.tag).toBe("div");
+      expect(divider?.style.height).toBe("1px");
+      expect(divider?.style.background).toBeDefined();
+
+      // 5th child = header.
+      const header = aside.children[4];
+      expect(header?.tag).toBe("p");
+      expect(header?.textContent).toBe("Analiza terenu");
+      expect(header?.style.textTransform).toBe("uppercase");
+
+      // 6th child onwards = stat rows, each with a label span + value span.
+      const row0 = aside.children[5];
+      expect(row0?.tag).toBe("p");
+      expect(row0?.children).toHaveLength(2);
+      expect(row0?.children[0]?.textContent).toBe("Wysokość");
+      expect(row0?.children[1]?.textContent).toBe("234,1 — 245,0 m n.p.m.");
+    });
+
+    it("renders nothing extra when terrainStats has zero rows", () => {
+      const env = makeMockEnv();
+      renderDomOverlay(
+        makeLayer({
+          geometry: {
+            kind: "domOverlay",
+            lines: ["a"],
+            anchor: "bottom-right",
+            terrainStats: { headerText: "Analiza terenu", rows: [] },
+          },
+        }),
+        { Cesium: env.Cesium as never, viewer: env.viewer as never },
+      );
+      // Only the single line paragraph — empty rows skip the block.
+      expect(env.created[0]?.children).toHaveLength(1);
+    });
+  });
 });

@@ -34,7 +34,12 @@ import {
 import { createOverlayReconciler } from "@/lib/overlays/overlayReconciler";
 import { plotLayerIdForTerytId } from "@/lib/overlays/plotLayerId";
 import { renderOverlay } from "@/lib/overlays/renderOverlay";
-import type { OverlayDisposer } from "@/lib/overlays/types";
+import type { OverlayDisposer, TerrainStatsBlock } from "@/lib/overlays/types";
+import { loadNmtRaster } from "@/lib/terrain/elevationSampler";
+import {
+  computeElevationStatistics,
+  formatTerrainStatsForCard,
+} from "@/lib/terrain/elevationStatistics";
 import { getTerrainStorage } from "@/lib/terrain/storage";
 
 import { LayerPanel } from "./LayerPanel";
@@ -930,6 +935,36 @@ export function Plot3DViewClient({
       // Area + Maks-zabudowa values are still the stakeholder-spec'd
       // Balice 773 constants; Phase A.5 mass-replication will lift
       // them through a per-plot data binding alongside the polygon.
+      // ADR-0006 M6 C4 — fetch + compute terrain stats for the
+      // Karta działki "Analiza terenu" section. The fetch is awaited
+      // here (~200-500 ms for a 234×234 m plot bake) BEFORE Karta is
+      // registered so the panel shows the full card on first paint
+      // rather than flashing without the analysis block. The
+      // browser-side HTTP cache absorbs subsequent toggles of the
+      // elevation heatmap layer (M6 C3), so we pay the network cost
+      // exactly once per viewer mount.
+      //
+      // Failure mode: if the raster hasn't been built for this plot
+      // (404 from /api/nmt/...), the card silently degrades to just
+      // the existing 3 lines. Phase A.5 mass-replication will surface
+      // this case for every newly-added plot until its raster bake
+      // runs; warning logged at the console for ops visibility.
+      let terrainStatsBlock: TerrainStatsBlock | undefined;
+      try {
+        const grid = await loadNmtRaster(NMT_PLOT_ID);
+        if (!disposed) {
+          terrainStatsBlock = formatTerrainStatsForCard(
+            computeElevationStatistics(grid),
+          );
+        }
+      } catch (err) {
+        console.warn(
+          `[Plot3DView] terrain stats unavailable for Karta działki (plot=${NMT_PLOT_ID}); render card without analysis block`,
+          err,
+        );
+      }
+      if (disposed) return;
+
       const labelParcel =
         parcelLabel ?? geometry.parcelNumber ?? geometry.terytId ?? "działka";
       const plotInfoLayerId = "plot-info-balice-773";
@@ -968,6 +1003,7 @@ export function Plot3DViewClient({
             "Maks. zabudowa 213 m² · wys. 9 m",
           ],
           anchor: "bottom-right",
+          terrainStats: terrainStatsBlock,
         },
         // `style.color` is required by the OverlayStyle shape but
         // unused by the DOM overlay renderer — the Atelier palette

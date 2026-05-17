@@ -60,6 +60,17 @@ const BODY_FONT = "var(--font-mono), 'JetBrains Mono', monospace";
 const HEADING_COLOR = "#15171A";
 const NUMERIC_COLOR = "#B95F3E";
 const BODY_COLOR = "#4A4F55";
+// M6 C4 — terrain analysis block palette. Divider tone matches the
+// card border (line-DEFAULT) but lighter so it reads as a quiet
+// section break rather than a hard rule. Header in clay/70 mirrors
+// the LayerPanel section-header treatment so the editorial register
+// stays consistent across the card + panel. Row labels in ink-body
+// for legibility against paper backdrop; values in ink-DEFAULT
+// (slightly bolder than label) so the eye lands on the number.
+const TERRAIN_DIVIDER_COLOR = "#ECE7DB"; // line-soft
+const TERRAIN_HEADER_COLOR = "rgba(185, 95, 62, 0.75)"; // clay/70
+const TERRAIN_LABEL_COLOR = "#4A4F55"; // ink-body
+const TERRAIN_VALUE_COLOR = "#15171A"; // ink-DEFAULT
 
 export interface DomOverlayRendererDeps {
   Cesium: typeof Cesium;
@@ -92,7 +103,8 @@ export function renderDomOverlay(
     );
   }
 
-  const { lines, anchor, insetPx = DEFAULT_INSET_PX } = layer.geometry;
+  const { lines, anchor, insetPx = DEFAULT_INSET_PX, terrainStats } =
+    layer.geometry;
   // `clamp(12px, 2vw, insetPx)` gives ~12 px on narrow viewports
   // (where 2vw is below 12 px) and the user-specified max on wider
   // ones (where 2vw exceeds insetPx). Single-line responsive
@@ -167,6 +179,57 @@ export function renderDomOverlay(
       p.style.textTransform = "uppercase";
     }
     element.appendChild(p);
+  }
+
+  // M6 C4 — terrain analysis block (Karta działki extension).
+  // Appended UNDER the `lines` block when present. Divider above
+  // section header reads as a quiet break ("here's a different
+  // category of information") without crossing into the app-like
+  // control-center territory the brief rules out for the layer
+  // panel. Same restraint applies here.
+  if (terrainStats && terrainStats.rows.length > 0) {
+    const divider = ownerDocument.createElement("div");
+    divider.style.margin = "10px 0 8px 0";
+    divider.style.height = "1px";
+    divider.style.background = TERRAIN_DIVIDER_COLOR;
+    element.appendChild(divider);
+
+    const header = ownerDocument.createElement("p");
+    header.textContent = terrainStats.headerText;
+    header.style.margin = "0 0 6px 0";
+    header.style.fontFamily = BODY_FONT;
+    header.style.fontSize = "10px";
+    header.style.fontWeight = "600";
+    header.style.color = TERRAIN_HEADER_COLOR;
+    header.style.letterSpacing = "0.08em";
+    header.style.textTransform = "uppercase";
+    element.appendChild(header);
+
+    for (let r = 0; r < terrainStats.rows.length; r++) {
+      const row = terrainStats.rows[r]!;
+      const rowEl = ownerDocument.createElement("p");
+      rowEl.style.margin = r === 0 ? "0" : "3px 0 0 0";
+      rowEl.style.display = "flex";
+      rowEl.style.justifyContent = "space-between";
+      rowEl.style.gap = "12px";
+      rowEl.style.fontFamily = NUMERIC_FONT;
+      rowEl.style.fontSize = "11px";
+      rowEl.style.lineHeight = "1.4";
+
+      const labelEl = ownerDocument.createElement("span");
+      labelEl.textContent = row.label;
+      labelEl.style.color = TERRAIN_LABEL_COLOR;
+      labelEl.style.letterSpacing = "0.02em";
+
+      const valueEl = ownerDocument.createElement("span");
+      valueEl.textContent = row.value;
+      valueEl.style.color = TERRAIN_VALUE_COLOR;
+      valueEl.style.fontVariantNumeric = "tabular-nums";
+
+      rowEl.appendChild(labelEl);
+      rowEl.appendChild(valueEl);
+      element.appendChild(rowEl);
+    }
   }
 
   viewer.container.appendChild(element);
