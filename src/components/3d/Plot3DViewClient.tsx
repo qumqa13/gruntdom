@@ -59,6 +59,17 @@ const ION_TOKEN = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN ?? "";
 // Currently the only baked tileset (depth-first scope on Balice 773 per
 // ADR-0006 v3); per-plot pyramids land with Phase A.5 mass replication.
 const NMT_TILESET_NAME = "balice";
+// ADR-0006 M6 C1/C3 — plot identifier for the NMT raster fixture under
+// `data/nmt/{plotId}/`. Currently the only baked raster (mirrors the
+// NMT_TILESET_NAME scope above); Phase A.5 lifts to per-plot config.
+const NMT_PLOT_ID = "dzialka-balice-773";
+// ADR-0006 M6 C3 — layer alpha for the elevation heatmap. The per-
+// pixel α in elevationHeatmapConfig encodes the gradient density
+// (paper-faint / moss-soft / clay-deep anchors at ~210/235/245);
+// layer α dims the whole overlay so it stays subordinate to the
+// polygon as foreground subject. Tuning knob 0.5–0.8: lower reads
+// as wash, higher reads as solid colored map.
+const ELEVATION_HEATMAP_OPACITY = 0.7;
 
 const CLAY_HEX = "#b54a2c";
 const PAPER_HEX = "#f4eedf";
@@ -809,6 +820,44 @@ export function Plot3DViewClient({
         source: {
           label: "derived NMT GRID1 · gdal_contour",
           sourceId: "1 m interval + 5 m index",
+        },
+      });
+
+      // ADR-0006 M6 C3 — dense elevation heatmap (siatka wysokościowa).
+      // Per-plot NMT GRID1 raster colorized through the editorial
+      // paper-faint → moss-soft → clay-deep gradient with anchors
+      // keyed to the plot's actual elevation range (anchored gradient
+      // — see elevationHeatmapConfig). Lazy-loaded: the renderer
+      // fetches the GeoTIFF + metadata only when the layer toggles
+      // ON for the first time per session (browser HTTP cache
+      // absorbs subsequent toggles). Default visibility OFF so the
+      // M3 baseline (slope wash + contour hairlines) is preserved
+      // and elevation analysis stays user-opt-in.
+      //
+      // Registered AFTER contour so the heatmap sits ABOVE contour
+      // hairlines in the imagery stack — when ON, the heatmap is the
+      // dominant analiza-section reading. Registered BEFORE streets
+      // so the navigable foreground (Toner Lines + Labels) still
+      // overlays the heatmap cleanly. Polygon outline (Cesium entity,
+      // drawn after all imagery) stays on top regardless.
+      const HEATMAP_LAYER_ID = `elevation-heatmap-${NMT_PLOT_ID}`;
+      layerRegistry.add({
+        id: HEATMAP_LAYER_ID,
+        section: "analiza",
+        name: "Siatka wysokościowa",
+        visible: resolveInitialVisibility(
+          persistedVisibility,
+          HEATMAP_LAYER_ID,
+          false, // M6 brief: default OFF — user opt-in
+        ),
+        geometry: {
+          kind: "elevationHeatmap",
+          plotId: NMT_PLOT_ID,
+        },
+        style: { color: CLAY_HEX, opacity: ELEVATION_HEATMAP_OPACITY },
+        source: {
+          label: "NMT GRID1 · gradient",
+          sourceId: "paper-faint → moss-soft → clay-deep",
         },
       });
 

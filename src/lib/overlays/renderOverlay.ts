@@ -21,6 +21,7 @@
 import type * as Cesium from "cesium";
 
 import { renderDomOverlay } from "./renderers/domOverlayRenderer";
+import { renderElevationHeatmapOverlay } from "./renderers/elevationHeatmapRenderer";
 import { renderLabelOverlay } from "./renderers/labelRenderer";
 import { renderPolygonOverlay } from "./renderers/polygonRenderer";
 import { renderRasterOverlay } from "./renderers/rasterRenderer";
@@ -54,6 +55,8 @@ export function renderOverlay(
       return renderLabelOverlay(layer, deps);
     case "domOverlay":
       return renderDomOverlay(layer, deps);
+    case "elevationHeatmap":
+      return renderElevationHeatmapOverlay(layer, deps);
     case "polyline":
       throw new Error(
         `renderOverlay: polyline renderer not implemented (layer "${layer.id}")`,

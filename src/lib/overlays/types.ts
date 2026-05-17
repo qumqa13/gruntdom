@@ -126,13 +126,32 @@ export interface DomOverlayGeometry {
   readonly insetPx?: number;
 }
 
+/**
+ * ADR-0006 M6 C3 — Dense elevation heatmap. Renders the per-plot NMT
+ * GRID1 raster (built by `scripts/build-nmt-raster.mjs`) as a single
+ * tile overlaid on the imagery stack. The renderer is solely
+ * responsible for the async fetch + sample + colorize pipeline; the
+ * registry just holds the plotId pointer. Layer toggles ON / OFF
+ * trigger fresh fetches (browser HTTP cache absorbs repeats) — keeps
+ * the registry pure data and lets the M3 reconciler's dispose-and-
+ * re-render pattern work without special-casing.
+ */
+export interface ElevationHeatmapGeometry {
+  readonly kind: "elevationHeatmap";
+  /** Plot identifier matching the on-disk `data/nmt/{plotId}/` directory. */
+  readonly plotId: string;
+  /** Optional URL prefix override (defaults to `/api/nmt`); test injection. */
+  readonly baseUrl?: string;
+}
+
 export type OverlayGeometry =
   | { readonly kind: "polygon"; readonly boundary: PolygonRing }
   | { readonly kind: "polyline"; readonly path: ReadonlyArray<LngLat> }
   | RasterGeometry
   | TilesetGeometry
   | LabelGeometry
-  | DomOverlayGeometry;
+  | DomOverlayGeometry
+  | ElevationHeatmapGeometry;
 
 /**
  * Visualization style. Renderers fall back to sensible defaults when a
