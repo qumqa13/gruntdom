@@ -690,6 +690,83 @@ Test suite at M3.5 close: **227/227 (+7 since M3 close — 4 in `cameraConstants
 - One backlog item ticked off: the "Fullscreen mode 2D map fragment bug" line from the M3 carry-forward + `docs/CURRENT_STATE.md` § "M3.5 / M4 cleanup" is now resolved by C2.
 - The M2.5-E C2 comment's forecasted second-pass tuning is now resolved by C1 — no longer "if 0.93 reads jumpy, drop _zoomFactor"; the drop happened.
 
+### M6 — Dense elevation reconstruction (foundation)
+
+**✅ Foundation closed 2026-05-17 on Balice 773.** Lands ahead of the v3-strategy M4 (MPZP) and M5 (Utilities) in execution order as a scope re-prioritization: dense elevation reconstruction is the core technological differentiation pillar of Plotview, and establishing its data + sampler + heatmap + statistics foundation strengthens every B2B sales conversation that asks "how is this different from drone capture?". M4 + M5 remain forward roadmap, unchanged in scope.
+
+**M6 ships the foundation only (C1–C4).** A fifth commit (C5 — split-view comparison via Cesium `SplitDirection`) landed initially but was reverted on stakeholder visual ack: the foundation heatmap alone reads as a low-contrast wash at this stage, and a comparison UX cannot deliver on its promise ("verify reconstruction matches reality with your own eyes") until the reconstruction itself is rendered at professional quality. Comparison-pattern UX is therefore deferred to **M7 — Professional terrain visualization** (hillshade + composite rendering + the deferred split-view chrome rebuilt on top of the upgraded base). The brief's six-commit envelope closes at C4 + this docs commit.
+
+Four atomic commits on `main`, three visual ack gates passed (C1–C4), +51 tests (227 → 278). tsc + lint clean.
+
+The foundation establishes:
+- **NMT GRID1 raster pipeline** (`scripts/build-nmt-raster.mjs`) baking per-plot GeoTIFF + metadata + statistics sidecars under `data/nmt/{plotId}/`. Reuses the M2 NMT mosaic to avoid the GUGiK ATOM godło-mapping complexity that already bit F1-T0 once.
+- **Pure elevation sampler** (`src/lib/terrain/elevationSampler.ts`) operating on a `RasterGrid` abstraction so sampling math is testable without depending on real GeoTIFFs (M2.5-B invariant preserved — zero Cesium imports, runtime-safe in vitest's node env).
+- **Elevation heatmap overlay** registered as the 7th LayerPanel layer ("Siatka wysokościowa", section "analiza", default OFF, lazy-loaded). Paper-faint → moss-soft → clay-deep gradient anchored to the plot's actual elevation range. *Foundation only — visualization quality reads as wash at this stage; M7 upgrades.*
+- **"Analiza terenu" stats block** appended to Karta działki via a typed `terrainStats?: TerrainStatsBlock` extension on `DomOverlayGeometry`. Five Polish-formatted rows (`Wysokość`, `Delta`, `Średni spadek`, `Maks. spadek`, `Zróżnicowanie σ`) computed via Horn's method on the sampled grid.
+
+Strong validation of three earlier architectural decisions:
+- **M2.5-B invariant holds at scale.** `LayerRegistry` stays pure data — the heatmap layer carries only a `plotId` pointer; the async fetch + colorize + canvas + Cesium plumbing lives entirely in the renderer.
+- **M2.7 raster renderer pattern earns its third production consumer.** Slope (M2.8), contour (M2.8), now elevation heatmap (M6). The parked-renderer strategy from M2.5-B is validated by repeated reuse.
+- **M3 reconciler handles new layer kinds without modification.** Adding `elevationHeatmap` to the `OverlayGeometry` union + a dispatcher case in `renderOverlay` plugged the new layer into the existing reconcile/dispose flow without special-casing.
+
+#### Architectural decisions
+
+- **NMT raster pipeline (C1):** chose to reuse the M2 mosaic (`.cache/terrain-build/mosaic-wgs84.tif`, itself baked from PZGiK NMT GRID1 sheets) over fresh GUGiK ATOM downloads. Same source data, avoids the godło-mapping complexity that already bit F1-T0 once. Output written to `data/nmt/{plotId}/` (outside `public/`) with negation gitignore rule for the showcase plot. Provenance preserved in `metadata.json`.
+- **Single-tile imagery over tile pyramid (C3):** the heatmap is a small (234×234 m × 1 m = 54,756 cells = ~220 KB raw, ~50 KB PNG) image painted to `OffscreenCanvas` once per session and served via `SingleTileImageryProvider`. No tile pyramid build step needed — keeps the renderer self-contained and runtime-lazy without per-zoom-level baking infrastructure.
+- **Anchored gradient over fixed scale (C3):** ramp anchors track the plot's actual `(minZ, maxZ)`. Different plots sit at very different absolute elevations (Balice ~234 m, Tatry foothills ~700 m); fixed-scale gradients would either waste the ramp or compress useful detail. Per-plot anchoring puts the full ramp across the plot's actual relief.
+- **Karta działki structured extension over flat lines append (C4):** added a typed `terrainStats?: TerrainStatsBlock` field to `DomOverlayGeometry` rather than appending more strings to the `lines` array. Gives the new "Analiza terenu" section its own typography register (label / value rows in tabular-nums mono) without forcing all existing DOM overlays to reason about index-based typography for stats content.
+- **Horn's method over Zevenbergen-Thorne for slope (C4):** Horn weights cardinal neighbours twice on the 3×3 window; the resulting slope field reads smoother on noisy 1m cells. Same algorithm `gdaldem slope` uses, so the M6 Karta numbers visually align with the M2.8 slope overlay on the same plot.
+- **Sync disposer + async render IIFE (C3):** heatmap renderer fires fetch + sample + colorize + Cesium-add inside an IIFE, returns a synchronous disposer that uses a `disposed` flag to cancel mid-stream and remove the imagery layer if it landed before disposal. Same shape as React effect cleanup; matches the M3 reconciler's remove-and-re-render pattern.
+
+#### Why C5 (split-view comparison) was reverted
+
+The original brief paired the foundation reconstruction with a Cesium-native `SplitDirection` chrome (vertical slider, REKONSTRUKCJA / ORTOFOTO side labels) so a buyer could drag a divider and see "is the heatmap reconstruction matching the ortofoto reality?". Stakeholder visual ack after C5 surfaced a structural problem with this pairing at the foundation stage:
+
+- The heatmap alone is a low-contrast wash at this stage (smooth gradient over a relatively flat plot — Balice's ~11 m delta over a 234 × 234 m bbox). The split-view amplifies this perception: the user spends most of the comparison looking at "a coloured side that doesn't read as terrain" next to "an ortofoto that does", and the takeaway becomes "the reconstruction looks faint", not "the reconstruction matches reality".
+- The comparison UX is structurally downstream of professional reconstruction quality. The reconstruction must stand alone as a confident terrain reading before a side-by-side comparison adds value — otherwise the comparison only highlights the gap.
+- The pattern is correct but the timing was wrong: split-view validates strong reconstruction; foundation-stage reconstruction has nothing to validate yet.
+
+Stakeholder rolled C5 back via `git reset --hard` and re-scoped the comparison UX into M7 alongside the visualization upgrade that makes it carry weight. The `splitViewState.ts` + `SplitViewControls.tsx` files are wiped from the repo; the editorial pattern (paper toggle button, clay vertical line, JetBrains Mono small-caps side labels, pointer-events drag with capture, keyboard Esc + ←/→ fallback, auto-enable-heatmap edge case) is captured in this section so M7 doesn't re-derive it from scratch.
+
+#### Four atomic commits (foundation)
+
+- C1 `5157eb1` — NMT raster build pipeline (`scripts/build-nmt-raster.mjs`, package.json wire, gitignore rules).
+- C2 `9a4a1d2` — `elevationSampler.ts` pure module + 18 tests (bilinear interpolation, no-data handling, sub-meter resolution support).
+- C3 `f91535a` — heatmap config + renderer + LayerRegistry registration + `/api/nmt/[plotId]/[file]` route + 18 new tests.
+- C4 `2a47218` — `elevationStatistics.ts` (Horn's method) + Karta działki "Analiza terenu" section + 15 new tests.
+- C5 *(reverted — deferred to M7 alongside the visualization upgrade)*.
+- C6 — this commit (ADR + PRODUCT + CURRENT_STATE + ROADMAP docs).
+
+#### Stakeholder pre-actions for visual ack (foundation)
+
+1. `npm install` (geotiff.js runtime dep added in C1).
+2. `npm run build-nmt-raster -- --plot dzialka-balice-773` once to bake the GeoTIFF fixture under `data/nmt/dzialka-balice-773/` (committed via gitignore negation rule). Requires Docker daemon + same GDAL pipeline M2.8 slope/contour bakes use.
+3. Visual ack across three foundation gates: per-commit checkpoints documented in the M6 brief — heatmap toggle on/off shows gradient layer without throwing, Karta działki "Analiza terenu" section renders with Polish-formatted rows (przecinki dziesiętne, m n.p.m. / % / σ).
+4. Push to origin after foundation ack (session-3 invariant: stakeholder owns push).
+
+#### Active surfaces after M6 foundation close
+
+- **7 LayerPanel-registered overlays** (was 6 at M3 close):
+  1. Granice działki (locked, polygon)
+  2. Karta działki (DOM overlay, now with Analiza terenu section)
+  3. Ulice (raster)
+  4. Nazwy ulic (raster)
+  5. Poziomice (raster)
+  6. Nachylenie (raster)
+  7. **Siatka wysokościowa** (elevation heatmap, default OFF, lazy-loaded) — NEW
+- **Karta działki "Analiza terenu"** block (5 Polish-formatted rows).
+- Camera envelope unchanged from M3.5; M2.5-B / M2.7 / M3 invariants intact.
+- **No split-view chrome** (deferred to M7).
+
+#### Parked for M7 onward
+
+- **M7 — Professional terrain visualization** (NEW, next priority): hillshade pass on top of the heatmap, composite rendering (heatmap blended with relief shading + ambient occlusion), per-cell contrast tuning, then re-introduce the split-view comparison UX (`SplitDirection` chrome, REKONSTRUKCJA / ORTOFOTO labels, slider with pointer-capture drag) on top of the upgraded base.
+- **M6.5 — Profil terenu cross-section tool** (renumbered from old ROADMAP M6, sequence preserved): the cross-section drawing primitive that builds on the M6 sampler + sits alongside M7 as another analytical primitive.
+- Original v3-strategy M4 (MPZP) and M5 (Utilities) unchanged — next thematic milestones.
+- GRID0.5 swap-in (`FUTURE_GRID0_5_RESOLUTION` constant already exported from `elevationSampler.ts`) — config change at the C1 build script when institutional access lands.
+
+---
+
 ### M4 — MPZP layer (first thematic overlay, 2D version)
 
 **Scope:** Connect "MPZP" toggle from M3 to `KIMPZP` WMS service. Render as semi-transparent (40% alpha) imagery layer overlaid on orto. Display gmina's MPZP zones (mieszkalna, usługowa, zielona, drogowa) with authoritative color coding. Tap on zone → popup with zone code + link to gmina's source document.

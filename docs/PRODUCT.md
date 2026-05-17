@@ -104,6 +104,36 @@ Platforma listingowa działek budowlanych z wbudowanym modułem analitycznym:
 | Tożsamość wizualna | Generic real-estate aesthetic | Editorial DNA (paper / ink / clay / moss palette) |
 | Optymalizacja sprzedaży | Per-cliek monetization | Per-listing exclusivity model |
 
+### 2.4 Rekonstrukcja z państwowych zasobów — pierwotna oś przewagi
+
+Sercem przewagi konkurencyjnej Plotview nie jest piękniejszy interfejs ani lepszy marketing — jest to **architektura danych oparta wyłącznie na państwowych zasobach geodezyjnych**. Każda działka w katalogu otrzymuje precyzyjną rekonstrukcję terenu z autorytatywnych źródeł, dostępnych w publicznej domenie i weryfikowalnych przez kupującego niezależnie.
+
+**Trzy filary stack-u danych terenu jako fosa konkurencyjna:**
+
+- **NMT GRID1 1 m (PZGiK GUGiK)** — autorytatywny model wysokościowy całej Polski, dostępny w trybie open-data. Plotview używa go jako warstwy fundamentalnej do siatki wysokościowej (M6, zamknięty 2026-05-17), profilu terenu (M6.5), analiz spadków, analizy nasłonecznienia, kalkulacji ziemnych. Każda działka w katalogu otrzymuje własną dedykowaną siatkę precyzyjną.
+- **Mapa zasadnicza (państwowy zasób geodezji szczegółowej)** — dla terenów w obrębach miejskich uzupełnia rastry NMT o gęste punkty pomiarowe geodezji szczegółowej (rzędne projektowe, charakterystyczne punkty terenu, krawędzie obiektów).
+- **GUGiK NMT API per-punktowo** — wysokość konkretnego punktu odpytywalna w trybie real-time przez serwis `services.gugik.gov.pl/nmt/?request=GetHbyXY` na potrzeby pomiarów custom przez użytkownika.
+
+**Co to oznacza ekonomicznie:**
+
+Konkurencja stojąca przed wyborem "jak pokazać teren działki" ma dwie ścieżki:
+- **Drone capture per-działka** — koszt 500–1500 PLN za pomiarowy lot, dodatkowy czas obróbki, problemy z pogodą i pozwoleniami. Dla katalogu 200 działek to 100–300 tys. PLN do wydania zanim platforma pokaże pierwszą rekonstrukcję.
+- **Fikcja marketingowa** — stockowe zdjęcia, schematyczne wizualizacje, marketingowe stylizacje — bez ścieżki ku weryfikacji.
+
+Plotview ma **trzecią ścieżkę: zero kosztu akwizycji per-działkę** dzięki opieraniu się na państwowych zasobach geodezyjnych. Skala rozwoju katalogu nie generuje proporcjonalnie rosnących kosztów akwizycji danych — koszt marginalny dodania nowej działki to przebudowa lokalnej siatki z istniejącego mosaiku NMT (sekundy).
+
+**Editorial DNA "rzetelność > marketing" dosłownie zmaterializowane:**
+
+Ta architektura nie jest taktyczną decyzją produktową — jest dosłownym zmaterializowaniem zasady rzetelności w stack technologiczny. Każda warstwa wizualna ma kliknięty plakietkę → "skąd pochodzą te dane" → odpowiedź zawsze prowadzi do publicznie weryfikowalnego źródła (PZGiK, Geoportal, ULDK GUGiK). Konkurencja stosująca drone capture nie ma tej własności — drone scan jest własnością wykonującego, niedostępny publicznie do re-weryfikacji przez stronę trzecią.
+
+W praktyce sprzedażowej B2B (deweloperzy, pośrednicy nieruchomości) ta przewaga konwertuje się w **zaufanie**: moduł analizy terenu nie jest "naszą interpretacją", tylko "tym co państwowy zasób mówi o tej działce, czytelnie zaprezentowane". Spór z buyerem o autorytetowość danych nie jest możliwy — buyer może otworzyć Geoportal w drugiej karcie i zweryfikować te same liczby.
+
+**Status implementacji (maj 2026):**
+
+- **M6 — Foundation (closed):** NMT raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats. Per-plot GeoTIFF baked z public M2 mosaiku, sample-and-color pipeline pure i lazy-loaded, statystyki (zakres wysokości, delta, spadki Horn's method, std-dev) widoczne w karcie działki.
+- **M7 — Professional terrain visualization (next priority):** hillshade + composite rendering doprowadza wizualizację rekonstrukcji do poziomu profesjonalnego stand-alone reading. Dopiero po M7 wprowadzony zostanie wzorzec porównania z ortofoto (split-view) — komparacja ma sens dopiero gdy strona "rekonstrukcji" stoi samodzielnie.
+- **M6.5 — Profil terenu cross-section tool:** narzędzie pomiarowe nad warstwą NMT, sekwencyjnie po M6.
+
 ## 3. Problem rynkowy i zasada rzetelności
 
 ### 3.1 Diagnoza obecnej sytuacji
@@ -317,7 +347,7 @@ Geoportal.gov.pl udostępnia narzędzie **"Profil terenu"** — użytkownik rysu
 
 Plotview implementuje tę funkcjonalność **jako natywny element strony szczegółowej działki**, z dodatkową wartością domeny: analizą zabudowywalności wynikającą z profilu.
 
-### 7.2 Specyfikacja funkcjonalna (M6 milestone)
+### 7.2 Specyfikacja funkcjonalna (M6.5 milestone)
 
 **Trigger:** User klika przycisk "Profil terenu" w panelu narzędzi viewera 3D.
 

@@ -1,6 +1,6 @@
 # Current State
 
-*Stan na: maj 2026 · M3 closed + M3.5 polish pass landed · commits pending stakeholder push*
+*Stan na: maj 2026 · M3 → M3.5 → M6 foundation closed · commits pending stakeholder push*
 
 Concise snapshot dla quick onboarding nowych uczestników (designers / devs / inwestorzy). Dla pełnej dokumentacji produktowej → [`PRODUCT.md`](PRODUCT.md). Dla roadmap forward → [`ROADMAP.md`](ROADMAP.md).
 
@@ -8,7 +8,7 @@ Concise snapshot dla quick onboarding nowych uczestników (designers / devs / in
 
 ## TL;DR
 
-Plotview to platforma listingowa działek budowlanych z wbudowanym modułem analitycznym terenu. Faza A MVP w trakcie realizacji, M3 (Layer Panel UI) właśnie zamknięty. Foundation gotowa dla M4-M9. Phase B premium tier z killer feature MPZP envelopes — parked po M10.
+Plotview to platforma listingowa działek budowlanych z wbudowanym modułem analitycznym terenu. Faza A MVP w trakcie realizacji, M3 (Layer Panel UI) + M3.5 (viewer polish) + **M6 foundation (dense elevation reconstruction)** zamknięte. M6 ships C1–C4 only — siatka wysokościowa + Karta działki "Analiza terenu" stats — bez split-view comparison UX (C5 reverted; visualization quality must reach professional stand-alone reading przed pairing z porównaniem). M7 (Professional terrain visualization) jako next priority — hillshade + composite rendering + re-introduction of split-view chrome na top of upgraded base. Phase B premium tier z killer feature MPZP envelopes — parked po M10.
 
 ---
 
@@ -23,7 +23,8 @@ Plotview to platforma listingowa działek budowlanych z wbudowanym modułem anal
 - **Wheel-zoom ergonomics:** per-notch step `_zoomFactor = 1.75` (M3.5 C1, ~35% of Cesium default 5.0) + decay `inertiaZoom = 0.93` (M2.5-E C2). Google-Maps-satellite-feel controlled increment, NOT jumpy
 - **Lighting:** sun + NW rake light directional (M2.6)
 - **Polygon overlay:** clay-toned ULDK GUGiK boundary, terrain-draped, lock-status invariant
-- **DOM overlay:** Karta działki anchored bottom-right (Balice DZIAŁKA 773 / 711 m² / Maks. zabudowa 213 m² · wys. 9 m)
+- **DOM overlay:** Karta działki anchored bottom-right (Balice DZIAŁKA 773 / 711 m² / Maks. zabudowa 213 m² · wys. 9 m) + **"Analiza terenu" section (M6 C4)** — five Polish-formatted rows (Wysokość min—max, Delta, Średni / Maks. spadek via Horn's method, Zróżnicowanie σ; locale `pl-PL` przecinki dziesiętne)
+- **Elevation heatmap (M6 C3, foundation):** "Siatka wysokościowa" overlay — per-plot NMT GRID1 raster colorized z editorial gradient (paper-faint → moss-soft → clay-deep) anchored to plot's actual elevation range. Default OFF; user opt-in via M3 panel. Lazy-loaded — GeoTIFF fetch tylko gdy toggled ON pierwszy raz per session. *Foundation only — visualization quality reads as low-contrast wash; M7 will upgrade z hillshade + composite rendering.*
 
 ### Layer panel (M3)
 
@@ -32,7 +33,7 @@ Plotview to platforma listingowa działek budowlanych z wbudowanym modułem anal
 - Sections:
   - **Dane działki:** Granice działki (locked) + Karta działki
   - **Otoczenie:** Ulice + Nazwy ulic
-  - **Analiza terenu:** Poziomice + Nachylenie
+  - **Analiza terenu:** Poziomice + Nachylenie + **Siatka wysokościowa (M6, default OFF)**
 - Toggle: per-layer visibility, `●` active / `○` inactive / em-dash locked
 - Persistence: localStorage z polygon-locked invariant (always-on regardless of saved state)
 - Mobile: `<768px` bottom-sheet anchored bottom edge, rounded top corners, no backdrop/drag-handle/animation
@@ -40,15 +41,16 @@ Plotview to platforma listingowa działek budowlanych z wbudowanym modułem anal
 
 ### Plakietka (caption pod viewerem)
 
-7 rows + italic disclosure:
+8 rows + italic disclosure:
 
 1. `● Nakładka: Granice działki · ULDK GUGiK · 120616_2.0002.773`
 2. `Ulice · Stamen Toner Lines · OSM`
 3. `Nazwy ulic · Stamen Toner Labels · OSM`
 4. `Poziomice · Derived NMT GRID1 · 1 m intervals · gdal_contour`
 5. `Nachylenie · Derived NMT GRID1 · 0-5/5-15/15-30/30%+ · gdaldem slope`
-6. `Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m · widok ×2 dla czytelności`
-7. `Ortofoto · Geoportal Orto · standardresolution · PZGiK`
+6. `Siatka wysokościowa · NMT GRID1 · gradient paper-faint → moss-soft → clay-deep` *(M6, default OFF)*
+7. `Teren · Polski NMT GRID1 · PZGiK · 1 m × 1 m · widok ×2 dla czytelności`
+8. `Ortofoto · Geoportal Orto · standardresolution · PZGiK`
 
 ### AI architectural visualizations
 
@@ -85,6 +87,7 @@ Output: `compliant` / `warning` (≥90%) / `not_compliant` per check; overall st
 | Testing | Vitest | 4.1 |
 | Linting | ESLint + custom provenance rule | 9.39 |
 | Terrain pipeline | GDAL + `tumgis/ctb-quantized-mesh` Docker | — |
+| Raster sampler (M6) | geotiff.js | 2.1 |
 
 ---
 
@@ -130,7 +133,7 @@ git push origin main
 
 ## Test suite
 
-**227/227 passing** (vitest + tsc + lint clean).
+**278/278 passing** (vitest + tsc + lint clean). +51 tests since M3.5 close (227 → 278) — wszystkie z M6 foundation surface (C1–C4). 1 pre-existing flaky network test (`t11-balice-773-runner`) hits live ULDK service — nie related do M6.
 
 Coverage breakdown:
 - LayerRegistry (M2.5-B): 11 tests
@@ -138,12 +141,16 @@ Coverage breakdown:
 - rasterRenderer: 7 tests
 - labelRenderer: 6 tests
 - tilesetRenderer: 8 tests
-- domOverlayRenderer: 10 tests
+- domOverlayRenderer: 13 tests (+3 dla M6 C4 terrainStats branch)
+- **elevationHeatmapRenderer (M6 C3): 6 tests**
 - renderOverlay dispatcher: 6 tests (exhaustiveness)
 - overlayReconciler: 9 tests (four branches + idempotence + orphan disposal + cycles + disposeAll)
 - LayerPanel: 12 tests (rendering + interaction)
 - LayerPanel grouping helper: 5 tests
 - localStorage persistence: 21 tests
+- **elevationSampler (M6 C2): 18 tests**
+- **elevationHeatmapConfig (M6 C3): 12 tests**
+- **elevationStatistics (M6 C4): 12 tests**
 - Other: ~117 tests (data validation, compliance engine, viz prompts, integration, etc.)
 
 ---
@@ -154,25 +161,27 @@ Coverage breakdown:
 
 - Push 4 commits do origin (stakeholder button)
 
-### M3.5 / M4 cleanup
+### M3.5 / M6 cleanup (closed)
 
 - ✅ ~~Fullscreen mode 2D map fragment bug~~ — resolved 2026-05-15 (M3.5 C2; body class + global CSS hide rule joined via stable class-name constants in `src/lib/3d/fullscreenState.ts`)
 - ✅ ~~Wheel-zoom step too aggressive at M2.5-E-tuned 0.93 inertia~~ — resolved 2026-05-15 (M3.5 C1; `_zoomFactor = 1.75` per-notch step reduction)
+- ✅ ~~Dense elevation reconstruction foundation~~ — landed 2026-05-17 (M6 C1–C4). NMT GRID1 raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats. C5 (split-view comparison) reverted — deferred do M7 alongside the visualization upgrade.
 
-### M4 (next milestone)
+### M4 (next thematic milestone)
 
-- First-person camera mode (Path B Cesium primary + Path A Google Maps Street View link fallback button)
+- MPZP layer (first thematic overlay, 2D version): connect "MPZP" toggle from M3 LayerPanel to KIMPZP WMS; semi-transparent imagery overlay with zone-color popups linking to gmina source docs
 
-### M5+ standalone milestones
+### M5+ standalone milestones (forward)
 
 - **M5** — Utility infrastructure layers ("Uzbrojenie terenu" section):
   - Wodociągi · Kanalizacja · Energia · Gaz · Ciepłownictwo · Telekomunikacja
   - Sources: Geoportal KIUT + emapa.gov.pl
   - New LayerSectionKey value: `"uzbrojenie"`
-- **M6** — Profil terenu tool (cross-section line drawing z elevation chart, inspirowane Geoportal "Profil terenu")
-- **M7** — Analytical modules (slope advanced / sun path / drainage / canopy detection z NMPT)
-- **M8** — Building proposal generation (footprint optimization + multi-objective scoring + MPZP compliance check)
-- **M9** — AI visualization workflow expansion (Path B data-driven render + proportion validation pipeline)
+- **M6.5** — Profil terenu tool (cross-section line drawing z elevation chart, inspirowane Geoportal "Profil terenu"). *Renumbered from old M6 after the dense-elevation foundation landed first; sequence preserved jako analytical primitive po M6 foundation.*
+- **M7** — Professional terrain visualization (NEW, **next priority**): hillshade pass on top of the heatmap, composite rendering (heatmap blended with relief shading + ambient occlusion), per-cell contrast tuning, plus re-introduction of split-view comparison chrome (`SplitDirection` slider + REKONSTRUKCJA / ORTOFOTO side labels) na top of upgraded base. C5 deferred from M6 lands here.
+- **M8** — Analytical modules suite (slope advanced / sun path / drainage / canopy detection z NMPT). *Renumbered from old M7.*
+- **M9** — Building proposal generation (footprint optimization + multi-objective scoring + MPZP compliance check). *Renumbered from old M8.*
+- **M10** — AI visualization workflow expansion (Path B data-driven render + proportion validation pipeline). *Renumbered from old M9.*
 
 ### Phase B (post-M10)
 

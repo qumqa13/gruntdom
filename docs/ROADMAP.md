@@ -17,7 +17,11 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ## Current position
 
-**M3 — closed (maj 2026).** Viewer transitioned z foundation-only into user-controllable interactive system. 6 active overlays · 3 editorial sections · localStorage persistence · mobile bottom-sheet. Foundation gotowa dla M4 i wszystkich pochodnych analytical modules.
+**M3 → M3.5 → M6 foundation — closed (maj 2026).** Viewer transitioned z foundation-only into user-controllable interactive system (M3), polish pass (M3.5 — zoom + fullscreen), then dense elevation reconstruction foundation (M6: NMT raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats). 7 active overlays · 3 editorial sections · localStorage persistence · mobile bottom-sheet. Foundation gotowa dla M4 (MPZP) i wszystkich pochodnych analytical modules.
+
+**M6 ships foundation only (C1–C4).** A fifth commit (C5 — split-view comparison via Cesium `SplitDirection`) landed initially but was reverted on stakeholder visual ack: the foundation heatmap alone reads as low-contrast wash at this stage, and the comparison UX cannot deliver on its promise until the reconstruction itself is rendered at professional quality. Comparison-pattern is deferred to **M7 — Professional terrain visualization** (NEW, next priority — hillshade + composite rendering + the deferred split-view chrome rebuilt on top of the upgraded base).
+
+**M6 landed ahead of M4/M5 as scope re-prioritization** — dense elevation reconstruction is the core technological differentiation pillar; foundation surfacing strengthens every B2B sales conversation that asks "how is this different from drone capture?". M4 (MPZP) and M5 (utility layers) remain forward roadmap, unchanged in scope. Original ROADMAP M6 (Profil terenu cross-section tool) renumbered to **M6.5** below; old M7–M10 cascade to M8–M11.
 
 ---
 
@@ -79,7 +83,27 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M6 — Profil terenu tool
+### M6 — Dense elevation reconstruction (foundation, closed)
+
+**✅ Foundation closed 2026-05-17 on Balice 773.** Four atomic commits + docs (C1–C4 + C6). C5 (split-view comparison) reverted — deferred do M7. +51 tests (227 → 278). tsc + lint clean.
+
+**Delivered:**
+- NMT GRID1 raster pipeline (`scripts/build-nmt-raster.mjs`) — per-plot GeoTIFF + metadata + statistics sidecars under `data/nmt/{plotId}/`. Reuses M2 mosaic; avoids GUGiK ATOM godło-mapping complexity.
+- Pure elevation sampler (`src/lib/terrain/elevationSampler.ts`) — bilinear sampling on `RasterGrid` abstraction. Zero Cesium imports.
+- Elevation heatmap layer (7th LayerPanel overlay, "Siatka wysokościowa", default OFF, lazy-loaded). Paper-faint → moss-soft → clay-deep gradient anchored to plot's actual elevation range. *Foundation only — visualization reads as wash at this stage; M7 upgrades.*
+- Karta działki "Analiza terenu" section — 5 Polish-formatted rows (Wysokość, Delta, Średni / Maks. spadek via Horn's method, Zróżnicowanie σ).
+
+**Why C5 was reverted:** the foundation heatmap reads as low-contrast wash over a relatively flat plot (Balice's ~11 m delta over 234 × 234 m). Split-view amplifies this perception — the user spends most of the comparison looking at "a coloured side that doesn't read as terrain" next to "an ortofoto that does", and the takeaway becomes "the reconstruction looks faint", not "the reconstruction matches reality". The pattern is correct but the timing was wrong: split-view validates strong reconstruction; foundation-stage reconstruction has nothing to validate yet. Stakeholder rolled C5 back and re-scoped the comparison UX into M7.
+
+**Time:** 7h CC work (delivered)
+
+**Provenance added:** `Siatka wysokościowa · NMT GRID1 · gradient paper-faint → moss-soft → clay-deep`
+
+---
+
+### M6.5 — Profil terenu tool
+
+*Renumbered from old M6 after M6 (dense elevation reconstruction foundation) landed first as scope re-prioritization in May 2026. Sequence preserved — the cross-section tool builds on the M6 sampler + sits alongside M7 as another analytical primitive.*
 
 **Scope:** Cross-section line drawing w viewerze z elevation chart output. Inspirowane Geoportal "Profil terenu" tool, ale z dodatkową wartością domeny (analiza zabudowywalności wynikająca z profilu).
 
@@ -105,7 +129,36 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M7 — Analytical modules suite
+### M7 — Professional terrain visualization (NEW, next priority)
+
+**Scope:** Bring the M6 foundation heatmap up to professional stand-alone reading quality, then re-introduce the split-view comparison UX (deferred from M6 C5) on top of the upgraded base.
+
+**Foundation gap M7 closes:** the M6 heatmap is anchored to the plot's actual elevation range but at plot-vicinity scale (~234 × 234 m, ~11 m delta on Balice) the smooth gradient reads as low-contrast wash. Buyer cannot extract the "this is a real terrain reading" signal from a flat-toned coloured square. The split-view comparison UX prepared in M6 C5 was reverted for exactly this reason — pairing two halves doesn't help when one half can't stand alone.
+
+**Visualization upgrade:**
+- **Hillshade pass** — derived from the same NMT GRID1 raster via Horn's gradient field; rendered as a multiply-blend layer on top of the heatmap so the gradient picks up directional relief. Same azimuth (315°) + altitude (30°) as M2.6 cartographic rake-light → consistent visual register across the viewer.
+- **Composite rendering** — heatmap × hillshade × ambient-occlusion blend in a single offscreen canvas pass; output replaces the M6 C3 raw heatmap as the SingleTileImageryProvider input. Per-cell contrast tuning so flat regions still differentiate from no-data + sloped cells get their dimensional read.
+- **Optional NMPT 1m overlay** — surface model (buildings + canopy) drawn faintly over the bare-earth heatmap so the reconstruction includes "things that are on the terrain" cue, not just the terrain itself. Behind a separate toggle.
+
+**Split-view re-introduction (deferred from M6 C5):**
+- `src/lib/3d/splitViewState.ts` + `src/components/viewer/SplitViewControls.tsx` rebuilt on top of the upgraded base. Editorial pattern captured in ADR 0006 M6 section: paper toggle button (top-right), clay vertical line (1.5px), small clay grip handle (14×14 paper square), JetBrains Mono small-caps side labels (REKONSTRUKCJA top-left, ORTOFOTO top-right), pointer-events with `setPointerCapture` for drag, keyboard Esc + ←/→ fallback, auto-enable-heatmap edge case when user toggles split ON with heatmap OFF.
+- Cesium-native `SplitDirection` (modern enum) + `scene.splitPosition` for real-time slider drag. Heatmap → LEFT, base ortofoto → RIGHT, Toner Lines / Labels stay NONE (overlay both halves for orientation).
+- `OverlayRendererDeps.onImageryLayerLifecycle?` callback re-introduced so Plot3DViewClient can capture the lazy-loaded heatmap imagery layer handle for split control.
+
+**Architectural changes:**
+- Hillshade derivation either runtime (in the heatmap renderer's canvas pass) or build-time (extend `scripts/build-nmt-raster.mjs` to bake the hillshade alongside the elevation raster). Bucket #2 — depends on runtime perf measurement on Balice.
+- Layer registration stays at 7 overlays; the visualization upgrade replaces the contents of "Siatka wysokościowa" rather than adding a new toggle.
+- M2.5-B invariant preserved — all blend/composite math stays in the renderer; registry + sampler remain pure.
+
+**Time estimate:** 10–14h CC work, 5–6 visual ack gates
+
+**Dependencies:** M6 foundation (closed). No new external services.
+
+---
+
+### M8 — Analytical modules suite
+
+*Renumbered from old M7 after M7 became Professional terrain visualization in May 2026.*
 
 **Scope:** Cztery pochodne analytical modules bazujące na existing terrain + new data sources.
 
@@ -128,7 +181,9 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M8 — Building proposal generation
+### M9 — Building proposal generation
+
+*Renumbered from old M8 after the May 2026 cascade.*
 
 **Scope:** Centerpiece module — algorytm generuje top-N propozycji zabudowy w specific locations on the plot, z multi-objective optimization.
 
@@ -165,7 +220,9 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M9 — AI visualization workflow expansion
+### M10 — AI visualization workflow expansion
+
+*Renumbered from old M9 after the May 2026 cascade.*
 
 **Scope:** Rozszerzenie current Replicate Flux Kontext Pro integration o dwie rzeczy:
 
@@ -189,7 +246,9 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M10 — Phase A close · production launch readiness
+### M11 — Phase A close · production launch readiness
+
+*Renumbered from old M10 after the May 2026 cascade.*
 
 **Scope:** Polish + hardening + production deployment readiness.
 
