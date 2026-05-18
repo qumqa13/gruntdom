@@ -24,6 +24,10 @@ import { useEffect, useRef, useState } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import { ZOOM_FACTOR } from "@/lib/3d/cameraConstants";
+import {
+  syncThreeCameraState,
+  type EnuBasisRowMajor,
+} from "@/lib/3d/cameraSynchronizer";
 import { createThreeCanvas, type ThreeCanvasHandle } from "@/lib/3d/threeCanvas";
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
 import {
@@ -433,6 +437,11 @@ export function Plot3DViewClient({
     // container. C1 scope = empty Three.js scene; visual ack must
     // show the M6 foundation render unchanged.
     let threeHandle: ThreeCanvasHandle | null = null;
+    // ADR-0007 M7 v3 C2 — companion cleanup for the per-frame sync
+    // listener + the C2 debug cube's THREE-side resources. Hoisted
+    // alongside `threeHandle` so the outer effect cleanup runs it
+    // before `threeHandle.dispose()` releases the WebGL context.
+    let threeSyncCleanup: (() => void) | null = null;
 
     (async () => {
       const Cesium = await import("cesium");
@@ -630,6 +639,172 @@ export function Plot3DViewClient({
       v.scene.light = new Cesium.DirectionalLight({
         direction: lightTravelDirection,
       });
+
+      // ADR-0007 M7 v3 C2 — Three.js scene + perspective camera
+      // + per-frame Cesium-driven sync. The C1 overlay canvas is now
+      // populated with a minimal scene tree and a `PerspectiveCamera`
+      // that mirrors Cesium's `v.camera` each frame via the
+      // `scene.postRender` hook. The synchronizer (in
+      // `cameraSynchronizer.ts`) is the pure-data math step;
+      // everything here is the THREE-specific integration glue:
+      // extract the ENU basis from the same `enuToFixed` matrix the
+      // M2.6 sun direction already uses (no recomputation), allocate
+      // the scene + camera, register the postRender listener, and
+      // tear it all down cleanly on effect cleanup.
+      //
+      // C2 ships a temporary 2 m wireframe debug cube at the scene
+      // origin (= plot centroid, ~1 m above ground) as visual ack
+      // scaffolding — confirms the camera sync stays locked as the
+      // user pans, tilts, and zooms in Cesium. C3 replaces this
+      // inline scene with the formalized `threeSceneManager.ts`
+      // (lights, ambient, scene tree, proper disposal hooks) and
+      // removes the debug cube.
+      if (threeHandle) {
+        try {
+          const THREE = await import("three");
+
+          // Extract the ECEF→ENU rotation basis from Cesium's
+          // `enuToFixed` matrix. The 3×3 rotation block of an
+          // ENU→ECEF matrix stores e/n/u basis vectors as COLUMNS
+          // in ECEF; the synchronizer's `EnuBasisRowMajor` layout
+          // wants those same vectors as ROWS (rows = e/n/u in
+          // ECEF). `Matrix3.getColumn` reads each column as a
+          // `Cartesian3`, then the assembly below flattens to a
+          // 9-tuple in the row-major shape. Using `getColumn` over
+          // raw indexed access keeps TypeScript narrow (Cesium's
+          // Matrix3 storage is typed as a bare `number[]`, so
+          // indexed access returns `number | undefined`).
+          const enuMatrix3 = Cesium.Matrix4.getMatrix3(
+            enuToFixed,
+            new Cesium.Matrix3(),
+          );
+          const eastEcef = Cesium.Matrix3.getColumn(
+            enuMatrix3,
+            0,
+            new Cesium.Cartesian3(),
+          );
+          const northEcef = Cesium.Matrix3.getColumn(
+            enuMatrix3,
+            1,
+            new Cesium.Cartesian3(),
+          );
+          const upEcef = Cesium.Matrix3.getColumn(
+            enuMatrix3,
+            2,
+            new Cesium.Cartesian3(),
+          );
+          const enuBasis: EnuBasisRowMajor = [
+            eastEcef.x, eastEcef.y, eastEcef.z,
+            northEcef.x, northEcef.y, northEcef.z,
+            upEcef.x, upEcef.y, upEcef.z,
+          ];
+          const plotCentroidEcef = {
+            x: plotCenterCartesian.x,
+            y: plotCenterCartesian.y,
+            z: plotCenterCartesian.z,
+          };
+
+          const threeScene = new THREE.Scene();
+          const threeCamera = new THREE.PerspectiveCamera(60, 1, 10, 5000);
+          threeCamera.up.set(0, 0, 1);
+
+          // Temporary debug cube — C3 will delete this block when the
+          // formal scene manager lands. Wireframe, clay color
+          // (editorial DNA, NOT a neon debug palette), 2 m on a side,
+          // anchored 1 m above plot centroid so the user can see it
+          // hover where the polygon centre sits without ground
+          // occlusion in oblique views.
+          const debugGeometry = new THREE.BoxGeometry(2, 2, 2);
+          const debugMaterial = new THREE.MeshBasicMaterial({
+            color: 0xb54a2c, // CLAY_HEX
+            wireframe: true,
+          });
+          const debugCube = new THREE.Mesh(debugGeometry, debugMaterial);
+          debugCube.position.set(0, 0, 1);
+          threeScene.add(debugCube);
+
+          const detachSync = v.scene.postRender.addEventListener(() => {
+            if (disposed || !threeHandle) return;
+            const canvas = v.canvas;
+            const w = canvas.clientWidth;
+            const h = Math.max(canvas.clientHeight, 1);
+            const frustum = v.camera.frustum as {
+              fovy?: number;
+              fov?: number;
+            };
+            // PerspectiveFrustum publishes `fovy` (vertical) in 1.141;
+            // the `fov` fallback covers older orthographic/oblique
+            // frustums in case a future tooling change swaps the type.
+            const fovYRadians = frustum.fovy ?? frustum.fov ?? Math.PI / 3;
+
+            const syncState = syncThreeCameraState(
+              {
+                positionEcef: {
+                  x: v.camera.position.x,
+                  y: v.camera.position.y,
+                  z: v.camera.position.z,
+                },
+                directionEcef: {
+                  x: v.camera.direction.x,
+                  y: v.camera.direction.y,
+                  z: v.camera.direction.z,
+                },
+                upEcef: {
+                  x: v.camera.up.x,
+                  y: v.camera.up.y,
+                  z: v.camera.up.z,
+                },
+                fovYRadians,
+                aspectRatio: w / h,
+              },
+              plotCentroidEcef,
+              enuBasis,
+            );
+
+            threeCamera.position.set(
+              syncState.position[0],
+              syncState.position[1],
+              syncState.position[2],
+            );
+            threeCamera.up.set(
+              syncState.up[0],
+              syncState.up[1],
+              syncState.up[2],
+            );
+            threeCamera.lookAt(
+              syncState.lookAt[0],
+              syncState.lookAt[1],
+              syncState.lookAt[2],
+            );
+            threeCamera.fov = syncState.fovDegrees;
+            threeCamera.aspect = syncState.aspectRatio;
+            threeCamera.near = syncState.near;
+            threeCamera.far = syncState.far;
+            threeCamera.updateProjectionMatrix();
+
+            // Mirror canvas size each frame so the framebuffer tracks
+            // Cesium's auto-resize. `false` for updateStyle: the CSS
+            // sizing (`inset: 0; width/height: 100%`) is handled by
+            // the canvas style attributes set in createThreeCanvas;
+            // setSize would otherwise overwrite them every frame.
+            threeHandle.renderer.setSize(w, h, false);
+            threeHandle.renderer.render(threeScene, threeCamera);
+          });
+
+          threeSyncCleanup = () => {
+            detachSync();
+            threeScene.remove(debugCube);
+            debugGeometry.dispose();
+            debugMaterial.dispose();
+          };
+        } catch (sceneErr) {
+          console.warn(
+            "[Plot3DView] Three.js scene + camera sync init failed — overlay stays empty",
+            sceneErr,
+          );
+        }
+      }
+
       // M2.5-D — viewer launches inert so wheel events pass through to
       // page scroll. The click-to-interact overlay flips `isActive`,
       // which a sibling useEffect mirrors onto enableInputs. Reading
@@ -1278,13 +1453,23 @@ export function Plot3DViewClient({
       // non-entity state (timers, listeners) clean up correctly.
       for (const dispose of overlayDisposers) dispose();
       overlayDisposers.length = 0;
-      // ADR-0007 M7 v3 C1 — dispose the Three.js overlay BEFORE
-      // Cesium tears down its widget DOM. The overlay canvas is a
-      // child of cesiumMountRef.current; Cesium's destroy() only
-      // wipes the elements it created itself, so the overlay would
-      // technically survive, but disposing first releases the WebGL
-      // context cleanly before its parent is repainted by a future
-      // remount.
+      // ADR-0007 M7 v3 C1+C2 — tear down Three.js layer BEFORE
+      // Cesium destroys its widget DOM. Order matters:
+      //   1. `threeSyncCleanup` detaches the postRender listener so
+      //      no more render() calls hit a half-disposed renderer or
+      //      a scene that's about to lose its meshes.
+      //   2. `threeHandle.dispose()` releases the WebGL context +
+      //      removes the overlay canvas from the DOM.
+      //   3. `viewer.destroy()` then wipes Cesium's own widget DOM.
+      // Cesium's destroy() only touches elements it created itself,
+      // so the overlay canvas would technically survive its parent
+      // teardown, but releasing the WebGL context cleanly first
+      // matches the symmetric-ownership invariant the M2.7 overlay
+      // disposers also follow.
+      if (threeSyncCleanup) {
+        threeSyncCleanup();
+        threeSyncCleanup = null;
+      }
       if (threeHandle) {
         threeHandle.dispose();
         threeHandle = null;

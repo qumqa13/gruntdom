@@ -123,14 +123,20 @@ export function buildThreeRendererConfig(
 }
 
 /**
- * Structural surface of `THREE.WebGLRenderer` consumed by this module.
- * Kept narrow so test fakes don't have to implement the full Three.js
- * renderer API.
+ * Structural surface of `THREE.WebGLRenderer` consumed by this module
+ * and its viewer integration. Kept narrow so test fakes don't have to
+ * implement the full Three.js renderer API. `render` accepts `unknown`
+ * for scene + camera so this interface does not leak THREE types into
+ * the bridge module's public surface (the viewer integration passes
+ * `THREE.Scene` + `THREE.PerspectiveCamera` at the actual call site,
+ * which TypeScript checks against THREE's own narrower signature
+ * through duck typing).
  */
 export interface ThreeRendererLike {
   setSize(width: number, height: number, updateStyle?: boolean): void;
   setPixelRatio(value: number): void;
   setClearColor(color: number, alpha: number): void;
+  render(scene: unknown, camera: unknown): void;
   dispose(): void;
   domElement?: HTMLCanvasElement;
 }
