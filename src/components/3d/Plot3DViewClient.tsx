@@ -30,7 +30,9 @@ import {
 } from "@/lib/3d/cameraSynchronizer";
 import {
   BLOOM_CONFIG,
+  TONE_MAPPING_CONFIG,
   buildBloomUniforms,
+  clampExposure,
 } from "@/lib/3d/postProcessing/composerPipeline";
 import { createThreeCanvas, type ThreeCanvasHandle } from "@/lib/3d/threeCanvas";
 import {
@@ -702,6 +704,50 @@ export function Plot3DViewClient({
           console.warn(
             "[Plot3DView] Bloom post-process tune failed — scene continues without bloom",
             bloomErr,
+          );
+        }
+      }
+
+      // ADR-0007 M7 v3 C5 — ACES filmic tone mapping + HDR pipeline.
+      // Cesium 1.141 native: `scene.highDynamicRange` enables the
+      // HDR framebuffer chain, `postProcessStages.tonemapper` selects
+      // the curve, `postProcessStages.exposure` controls the
+      // brightness multiplier. ACES is the cinema-grade standard —
+      // soft highlight roll-off + rich shadow detail, the
+      // baseline for the Death Stranding terrain / luxury real
+      // estate viz quality bar this milestone targets.
+      //
+      // Gated on `highDynamicRangeSupported` so devices without the
+      // required GL extensions (rare on modern hardware but
+      // possible in headless / virtualized contexts) fall back to
+      // the default linear pipeline gracefully — bloom from C4
+      // still runs, the scene just doesn't have the filmic curve.
+      //
+      // Visual ack: side-by-side with C4 (bloom only, linear
+      // tonemap) shows softer highlights in the sky, richer shadow
+      // detail under tree canopies, and a generally "filmic" feel
+      // vs. the default flat WebGL rendering.
+      if (TONE_MAPPING_CONFIG.enabled && v.scene.highDynamicRangeSupported) {
+        try {
+          v.scene.highDynamicRange = true;
+          v.scene.postProcessStages.tonemapper =
+            Cesium.Tonemapper[TONE_MAPPING_CONFIG.algorithm];
+          v.scene.postProcessStages.exposure = clampExposure(
+            TONE_MAPPING_CONFIG.exposure,
+          );
+          overlayDisposers.push(() => {
+            // Symmetric inverse: drop HDR + reset to Cesium's default
+            // tone curve (PBR_NEUTRAL in 1.141). The scene continues
+            // to function under linear rendering if the disposer
+            // fires during route navigation.
+            v.scene.highDynamicRange = false;
+            v.scene.postProcessStages.tonemapper = Cesium.Tonemapper.PBR_NEUTRAL;
+            v.scene.postProcessStages.exposure = 1.0;
+          });
+        } catch (tonemapErr) {
+          console.warn(
+            "[Plot3DView] HDR tonemap setup failed — scene continues without filmic curve",
+            tonemapErr,
           );
         }
       }

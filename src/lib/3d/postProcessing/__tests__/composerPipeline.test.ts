@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLOOM_CONFIG,
+  MAX_EXPOSURE,
+  MIN_EXPOSURE,
+  TONE_MAPPING_CONFIG,
   buildBloomUniforms,
+  clampExposure,
 } from "../composerPipeline";
 
 /**
@@ -148,5 +152,55 @@ describe("buildBloomUniforms — edge cases", () => {
     expect(Number.isFinite(u.contrast)).toBe(true);
     expect(Number.isFinite(u.brightness)).toBe(true);
     expect(Number.isFinite(u.sigma)).toBe(true);
+  });
+});
+
+describe("TONE_MAPPING_CONFIG", () => {
+  it("pins algorithm to ACES (cinematic standard — Death Stranding / luxury viz reference)", () => {
+    expect(TONE_MAPPING_CONFIG.algorithm).toBe("ACES");
+  });
+
+  it("pins exposure to 1.0 (neutral baseline)", () => {
+    expect(TONE_MAPPING_CONFIG.exposure).toBe(1.0);
+  });
+
+  it("ships with HDR + tonemap default-ON", () => {
+    expect(TONE_MAPPING_CONFIG.enabled).toBe(true);
+  });
+
+  it("default exposure lands inside the [MIN, MAX] clamp band", () => {
+    // Regression catch: if a future config edit sets exposure outside
+    // the visual-ack envelope, this fails before runtime clamps it
+    // silently.
+    expect(TONE_MAPPING_CONFIG.exposure).toBeGreaterThanOrEqual(MIN_EXPOSURE);
+    expect(TONE_MAPPING_CONFIG.exposure).toBeLessThanOrEqual(MAX_EXPOSURE);
+  });
+});
+
+describe("clampExposure", () => {
+  it("clamps below the floor (0.5)", () => {
+    expect(clampExposure(0.1)).toBe(MIN_EXPOSURE);
+    expect(clampExposure(-1)).toBe(MIN_EXPOSURE);
+  });
+
+  it("clamps above the ceiling (2.0)", () => {
+    expect(clampExposure(5)).toBe(MAX_EXPOSURE);
+    expect(clampExposure(10)).toBe(MAX_EXPOSURE);
+  });
+
+  it("passes through values inside the band unchanged", () => {
+    expect(clampExposure(0.7)).toBe(0.7);
+    expect(clampExposure(1.0)).toBe(1.0);
+    expect(clampExposure(1.5)).toBe(1.5);
+  });
+});
+
+describe("exposure band constants", () => {
+  it("pins MIN_EXPOSURE to 0.5 — below reads near-black", () => {
+    expect(MIN_EXPOSURE).toBe(0.5);
+  });
+
+  it("pins MAX_EXPOSURE to 2.0 — above blows out highlights", () => {
+    expect(MAX_EXPOSURE).toBe(2.0);
   });
 });
