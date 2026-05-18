@@ -1513,6 +1513,18 @@ Niniejszy dokument stanowi product specification po zamknięciu M3 (Layer Panel 
 - Specyfikacja dla third-party integrations
 - Baseline dla audytów i compliance reviews
 
----
-
-*Plotview — Modelowanie terenu jako fundament rzetelnych decyzji.*
+> **DIRECTION PIVOT (maj 2026):** Plotview ewoluuje z engineering survey 
+> aesthetic do **cinematic plot reconstruction platform**. Quality bar: 
+> Gaea3 / Death Stranding terrain / luxury real estate viz (Lumion, 
+> Twinmotion, Unreal architectural).
+>
+> Sekcje 1.1-1.3 będą rewritten synchronicznie z Faza 3 (PBR terrain 
+> materials w M8 v3) — by avoid premature brand redefinition przed proof.
+>
+> **M7 v3 cinematic foundation zamknięty 2026-05-18** (commits C1–C8 na 
+> `main`, pending stakeholder push). 8 atomic commits: Three.js dual-canvas 
+> architecture + per-frame camera sync + scene infrastructure + 
+> Cesium-native post-processing pipeline (bloom · ACES filmic tone mapping 
+> · LUT color grading z 3 mood presets · FXAA) + ADR 0007 + ten docs 
+> cascade. Test suite 360/360 passing, tsc + lint clean. Pełen rationale 
+> + Phase 3-7 roadmap forward w [`adr/0007-cinematic-foundation.md`](adr/0007-cinematic-foundation.md).

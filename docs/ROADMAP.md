@@ -17,11 +17,13 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ## Current position
 
-**M3 → M3.5 → M6 foundation — closed (maj 2026).** Viewer transitioned z foundation-only into user-controllable interactive system (M3), polish pass (M3.5 — zoom + fullscreen), then dense elevation reconstruction foundation (M6: NMT raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats). 7 active overlays · 3 editorial sections · localStorage persistence · mobile bottom-sheet. Foundation gotowa dla M4 (MPZP) i wszystkich pochodnych analytical modules.
+**M3 → M3.5 → M6 foundation → M7 v3 cinematic foundation — closed (maj 2026).** Viewer transitioned z foundation-only into user-controllable interactive system (M3), polish pass (M3.5 — zoom + fullscreen), dense elevation reconstruction foundation (M6: NMT raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats), and most recently **the cinematic visualization foundation (M7 v3, Phase 1+2)** after a paradigm pivot away from the engineering-survey direction the original ADR-0006 M7 envisioned.
 
-**M6 ships foundation only (C1–C4).** A fifth commit (C5 — split-view comparison via Cesium `SplitDirection`) landed initially but was reverted on stakeholder visual ack: the foundation heatmap alone reads as low-contrast wash at this stage, and the comparison UX cannot deliver on its promise until the reconstruction itself is rendered at professional quality. Comparison-pattern is deferred to **M7 — Professional terrain visualization** (NEW, next priority — hillshade + composite rendering + the deferred split-view chrome rebuilt on top of the upgraded base).
+**Paradigm pivot (ADR 0007, maj 2026):** two iterations on the cartographic/surveyor M7 track were attempted (M7 v1 hillshade+composite+split-view; M7 v2 dense contours + Wysokości labels + Spadek arrows + camera ×3) and both reverted on stakeholder visual ack — the engineering-survey register telegraphed "technical instrument" rather than "premium product surface." Stakeholder DNA shift in the 2026-05-18 session: pivot to **cinematic plot reconstruction platform** modeled on Gaea3 (terrain rendering standard) + Death Stranding terrain (Kojima / Gaea-powered) + luxury real estate viz (Lumion / Twinmotion / Unreal architectural). M7 v3 lands the foundation (Cesium + Three.js dual-canvas architecture + post-processing pipeline); Phase 3+ delivers the content layers (PBR materials, vegetation, atmospheric depth, lighting).
 
-**M6 landed ahead of M4/M5 as scope re-prioritization** — dense elevation reconstruction is the core technological differentiation pillar; foundation surfacing strengthens every B2B sales conversation that asks "how is this different from drone capture?". M4 (MPZP) and M5 (utility layers) remain forward roadmap, unchanged in scope. Original ROADMAP M6 (Profil terenu cross-section tool) renumbered to **M6.5** below; old M7–M10 cascade to M8–M11.
+**M7 v3 deliverables (C1–C8, 2026-05-18):** Three.js renderer overlay alongside Cesium · per-frame ECEF → plot-local-ENU camera sync · scene infrastructure (ambient + NW 315°/30° directional sun matching M2.6 Cesium-side rake) · bloom on highlights · ACES filmic tone mapping + HDR · color grading via custom shader z 3 mood presets + dropdown UI · FXAA edge smoothing · ADR 0007 + docs cascade. 82 new tests (278 → 360); tsc + lint clean.
+
+**Cascade impact on the original ROADMAP M7-M11:** the engineering-track modules (cross-section tool, analytical modules suite, split-view comparison) are **parked** — they may return as Phase 8+ analytical UX on top of the cinematic platform once Phase 3-7 raises the visual reconstruction quality to where analytical chrome reads as polish rather than noise. The new forward sequence is **M8 v3 → M9 v3 → M10 v3 → M11 v3 → M12 v3 → M13 v3+** building the cinematic content track. M4 (MPZP) and M5 (utility layers) remain valid parallel tracks; they can land between cinematic milestones without disrupting the sequence.
 
 ---
 
@@ -101,89 +103,109 @@ Każda faza zamyka się na **production-ready inflection point** — Phase A clo
 
 ---
 
-### M6.5 — Profil terenu tool
+### M7 v3 — Cinematic visualization foundation (closed)
 
-*Renumbered from old M6 after M6 (dense elevation reconstruction foundation) landed first as scope re-prioritization in May 2026. Sequence preserved — the cross-section tool builds on the M6 sampler + sits alongside M7 as another analytical primitive.*
+**✅ Closed 2026-05-18 on Balice 773.** Eight atomic commits + ADR 0007 + docs cascade. +82 tests (278 → 360). tsc + lint clean.
 
-**Scope:** Cross-section line drawing w viewerze z elevation chart output. Inspirowane Geoportal "Profil terenu" tool, ale z dodatkową wartością domeny (analiza zabudowywalności wynikająca z profilu).
+**Delivered (per ADR 0007 §Phase 1+2 Deliverables):**
 
-**Functional spec:**
-- User klika "Profil terenu" w panel narzędzi → cursor zmienia w mode rysowania
-- User rysuje linię referencyjną (1-5 wierzchołków)
-- System wylicza profile real-time z NMT GRID1 z preview during drawing
-- Output panel slide-up:
-  - Wykres elevation chart z osią X (długość) Y (elewacja n.p.m.)
-  - Tabela parametrów (długość, ascent, descent, max/min/avg elevation, max slope, avg slope)
-  - Wybór modelu: NMT 1m / NMT 5m / NMPT 1m
-  - Eksport: CSV, screenshot, share-link
-- Multi-line comparison (do 5 linii jednocześnie)
-- Analiza zabudowywalności wbudowana ("idealna dla fundamentów" / "wymaga retaining wall" / "znaczące prace ziemne")
+- C1 — Three.js deps (three / @react-three/fiber / @react-three/drei / @react-three/postprocessing / three-stdlib) + dual-canvas architecture (`threeCanvas.ts`, `cesiumThreeBridge.ts`)
+- C2 — Per-frame Cesium → Three.js camera sync (`cameraSynchronizer.ts`); temporary debug cube for visual ack
+- C3 — Three.js scene infrastructure (`threeSceneManager.ts`); paper-warm ambient + NW 315°/30° directional sun
+- C4 — Bloom post-process on Cesium pixels (threshold 0.85, strength 0.4, radius 0.5)
+- C5 — ACES filmic tone mapping + HDR pipeline (exposure 1.0 default, clamped [0.5, 2.0])
+- C6 — Color grading via custom Cesium PostProcessStage shader; 3 presets (Cinematic warm default / Dramatic / Natural); mood dropdown in viewer chrome
+- C7 — FXAA edge antialiasing
+- C8 — This ADR + docs cascade (PRODUCT / ROADMAP / CURRENT_STATE)
 
-**Architectural changes:**
-- New tool mode w viewer chrome
-- `ProfileService` class dla DEM raster sampling
-- Recharts (nowa dep) lub custom SVG dla elevation chart
-- Persistencja: localStorage z encoded geometry dla share-link
+**Why M7 v3 closes M7 entirely:** the engineering-survey track (M7 v1 hillshade+composite+split-view, M7 v2 dense contours + Wysokości labels) was attempted twice and reverted both times before this iteration. The cinematic pivot is documented in [`adr/0007-cinematic-foundation.md`](adr/0007-cinematic-foundation.md). Original M7 ROADMAP scope (Professional terrain visualization, hillshade pass, split-view) is parked indefinitely — Phase 3-7 supersede with a different rendering paradigm; if comparable analytical chrome returns, it lands as a Phase 8+ feature on top of the cinematic platform.
 
-**Time estimate:** 12-18h CC work
+**Visual ack:** open Balice 773 → scene reads distinctly cinematic vs. M6 foundation baseline. Bloom halos on sunny ortofoto patches, filmic highlight/shadow rolloff, Cinematic warm warmth on default, clean polygon + label edges. Mood dropdown toggle (bottom-left) → noticeable color shift between presets.
 
 ---
 
-### M7 — Professional terrain visualization (NEW, next priority)
+### M8 v3 — PBR terrain materials (Phase 3, next priority)
 
-**Scope:** Bring the M6 foundation heatmap up to professional stand-alone reading quality, then re-introduce the split-view comparison UX (deferred from M6 C5) on top of the upgraded base.
-
-**Foundation gap M7 closes:** the M6 heatmap is anchored to the plot's actual elevation range but at plot-vicinity scale (~234 × 234 m, ~11 m delta on Balice) the smooth gradient reads as low-contrast wash. Buyer cannot extract the "this is a real terrain reading" signal from a flat-toned coloured square. The split-view comparison UX prepared in M6 C5 was reverted for exactly this reason — pairing two halves doesn't help when one half can't stand alone.
-
-**Visualization upgrade:**
-- **Hillshade pass** — derived from the same NMT GRID1 raster via Horn's gradient field; rendered as a multiply-blend layer on top of the heatmap so the gradient picks up directional relief. Same azimuth (315°) + altitude (30°) as M2.6 cartographic rake-light → consistent visual register across the viewer.
-- **Composite rendering** — heatmap × hillshade × ambient-occlusion blend in a single offscreen canvas pass; output replaces the M6 C3 raw heatmap as the SingleTileImageryProvider input. Per-cell contrast tuning so flat regions still differentiate from no-data + sloped cells get their dimensional read.
-- **Optional NMPT 1m overlay** — surface model (buildings + canopy) drawn faintly over the bare-earth heatmap so the reconstruction includes "things that are on the terrain" cue, not just the terrain itself. Behind a separate toggle.
-
-**Split-view re-introduction (deferred from M6 C5):**
-- `src/lib/3d/splitViewState.ts` + `src/components/viewer/SplitViewControls.tsx` rebuilt on top of the upgraded base. Editorial pattern captured in ADR 0006 M6 section: paper toggle button (top-right), clay vertical line (1.5px), small clay grip handle (14×14 paper square), JetBrains Mono small-caps side labels (REKONSTRUKCJA top-left, ORTOFOTO top-right), pointer-events with `setPointerCapture` for drag, keyboard Esc + ←/→ fallback, auto-enable-heatmap edge case when user toggles split ON with heatmap OFF.
-- Cesium-native `SplitDirection` (modern enum) + `scene.splitPosition` for real-time slider drag. Heatmap → LEFT, base ortofoto → RIGHT, Toner Lines / Labels stay NONE (overlay both halves for orientation).
-- `OverlayRendererDeps.onImageryLayerLifecycle?` callback re-introduced so Plot3DViewClient can capture the lazy-loaded heatmap imagery layer handle for split control.
+**Scope:** First Phase 3+ Three.js scene content. Apply PBR materials (albedo / normal / roughness / AO maps) to the NMT terrain mesh via the new `threeMesh` renderer kind. The M7 v3 foundation's `threeSceneManager` + camera sync + post-processing pipeline all activate against real geometry here.
 
 **Architectural changes:**
-- Hillshade derivation either runtime (in the heatmap renderer's canvas pass) or build-time (extend `scripts/build-nmt-raster.mjs` to bake the hillshade alongside the elevation raster). Bucket #2 — depends on runtime perf measurement on Balice.
-- Layer registration stays at 7 overlays; the visualization upgrade replaces the contents of "Siatka wysokościowa" rather than adding a new toggle.
-- M2.5-B invariant preserved — all blend/composite math stays in the renderer; registry + sampler remain pure.
+- `threeMesh` renderer kind formally joins the M2.7 OverlayLayer foundation union; M3 reconciler dispatch path extended.
+- Three.js terrain mesh sampled from the same NMT GRID1 raster M6 uses; geometry generated in plot-local ENU coordinates (anchored at centroid, float32-safe at our scale).
+- PBR materials sourced from a curated tile library (procedural grass / dirt / rock with editorial color tuning to match Atelier palette warmth).
 
-**Time estimate:** 10–14h CC work, 5–6 visual ack gates
+**Visual ack gate:** scene reads as a Gaea-rendered terrain demo. Material variation across the plot (grass dominant, dirt patches near disturbed areas, rock outcrops where slope exceeds threshold), correct shading under the C3 directional sun, bloom + tone mapping + color grade from M7 v3 all active.
 
-**Dependencies:** M6 foundation (closed). No new external services.
+**Time estimate:** 12–20h CC work.
 
 ---
 
-### M8 — Analytical modules suite
+### M9 v3 — Vegetation scatter (Phase 4)
 
-*Renumbered from old M7 after M7 became Professional terrain visualization in May 2026.*
-
-**Scope:** Cztery pochodne analytical modules bazujące na existing terrain + new data sources.
-
-**Modules:**
-
-1. **Slope advanced** — per-footprint scoring + aspect analysis + buildability classification
-2. **Sun path** — symulacja cieni dla 4 momentów rocznych + roczna heatmap nasłonecznienia + photovoltaic potential
-3. **Drainage** — watershed delineation + flow direction + pooling risk + stream network identification
-4. **Canopy** — drzewostan detection z NMPT 1m (height threshold = obiekt powierzchniowy, density classification)
+**Scope:** InstancedMesh-backed trees / shrubs / grass tufts on the PBR terrain. Density + species selection informed by NMPT 1m canopy detection where available; fallback to procedural distribution by slope + elevation when not.
 
 **Architectural changes:**
-- New `lib/analysis/` module z 4 service classes
-- New raster layer types (per-cell scoring grids)
-- Possibly: Web Worker offload dla heavy computation
-- Output formats: visualization layer + tabular data + PDF report
+- `threeInstancedScatter` renderer kind joins the foundation union.
+- New `vegetationLibrary.ts` with editorial-curated species: Polish broadleaf (oak / linden), conifer (Scots pine / spruce), shrubs (hazel / dogwood), grass tufts.
+- Performance budget: ≤50k instances per plot at 60fps on mid-range mobile.
 
-**Time estimate:** 20-30h CC work (heavy domain logic)
-
-**Dependencies:** NMPT 1m API integration (currently używamy tylko NMT)
+**Time estimate:** 14–20h CC work.
 
 ---
 
-### M9 — Building proposal generation
+### M10 v3 — Atmospheric depth (Phase 5)
 
-*Renumbered from old M8 after the May 2026 cascade.*
+**Scope:** Height fog + distant haze + exponential-squared fall-off matched to ortofoto color temperature. Reads as "Google Earth premium tilt" — the sensation that the scene extends past what's directly rendered.
+
+**Architectural changes:**
+- Cesium's atmospheric scattering interacts with Three.js scene through the camera sync (shared sun direction).
+- Three.js fog applied per-material in the PBR pipeline; distance-based falloff calibrated to plot envelope.
+
+**Time estimate:** 6–10h CC work.
+
+---
+
+### M11 v3 — Time-of-day lighting (Phase 6)
+
+**Scope:** Sun position parameterized by date/time; real-time shadow maps on the Three.js scene (building proposals + terrain features cast shadows on terrain mesh). Replaces the C3 static NW 315°/30° rake with a real-time sun model.
+
+**Architectural changes:**
+- `SunModel` service computes ECEF sun direction from date/time/latitude.
+- Three.js DirectionalLight position updates each frame; shadow map cascade for plot-scale geometry.
+- Cesium-side sun stays editorial (M2.6 rake unchanged) OR also switches to real-time — Bucket #2 decision at M11 v3 brief.
+
+**Time estimate:** 14–20h CC work.
+
+---
+
+### M12 v3 — Polish + tuning (Phase 7 close)
+
+**Scope:** Visual ack iteration across all Phase 3-7 phases. Performance audit (60fps stable on mid-range mobile, P75 cold-cache initial load ≤4s including PBR texture streaming). Final cinematic feel calibration — bloom + tone map + color grade parameters adjusted per accumulated experience on real PBR content.
+
+**Time estimate:** 8–12h CC work.
+
+---
+
+### M13 v3+ — Buildings AI visualization on cinematic platform
+
+**Scope:** Building proposal generation (per `PRODUCT.md` section 15) ported to the cinematic platform. AI-generated facades projected onto PBR-shaded building meshes in the Three.js scene; M11 v3 real-time shadows; MPZP envelopes from neighbour plots rendered alongside.
+
+**Time estimate:** 25–40h CC work (largest content milestone).
+
+---
+
+### Parked — engineering-track modules
+
+The following original ROADMAP modules are **parked indefinitely** following the M7 v3 paradigm pivot. They may return as Phase 8+ analytical UX on top of the cinematic platform if/when the visual reconstruction quality justifies adding analytical chrome:
+
+- **Profil terenu cross-section tool** — was M6.5 / old M6. Cross-section line drawing + elevation chart.
+- **Analytical modules suite** — was old M7 / M8. Slope advanced, sun path, drainage, canopy detection.
+- **Split-view comparison** — was M6 C5 / M7 v1 / M7 v2. Reverted multiple times; rendered moot by the cinematic-track architecture where comparison-of-styles is a per-frame post-process toggle, not a chrome feature.
+
+---
+
+### M9 — Building proposal generation (parked — superseded by M13 v3)
+
+*Original M9 from the engineering-track roadmap. Parked; superseded by M13 v3 building proposals on the cinematic platform.*
 
 **Scope:** Centerpiece module — algorytm generuje top-N propozycji zabudowy w specific locations on the plot, z multi-objective optimization.
 
@@ -428,8 +450,9 @@ Forward-looking, not committed roadmap:
 - [`adr/0002-3d-viewer-and-data-layer.md`](adr/0002-3d-viewer-and-data-layer.md) — Editorial 3D viewer + verified data layer
 - [`adr/0004-defer-puppeteer-screenshots-post-f2.md`](adr/0004-defer-puppeteer-screenshots-post-f2.md) — Deferred Puppeteer screenshots
 - [`adr/0005-cesium-ion-token-in-client-bundle.md`](adr/0005-cesium-ion-token-in-client-bundle.md) — Cesium ION token strategy
-- [`adr/0006-interactive-3d-viewer-roadmap.md`](adr/0006-interactive-3d-viewer-roadmap.md) — **MASTER ROADMAP** (most comprehensive)
+- [`adr/0006-interactive-3d-viewer-roadmap.md`](adr/0006-interactive-3d-viewer-roadmap.md) — Original master roadmap (M0-M6 foundations preserved; §M7 superseded by ADR-0007)
+- [`adr/0007-cinematic-foundation.md`](adr/0007-cinematic-foundation.md) — **Paradigm pivot: cinematic plot reconstruction platform** (supersedes ADR-0006 §M7; cascades M8 v3 onward)
 
 ---
 
-*Last revised: maj 2026, M3 close. Synchronizowany z ADR 0006 section "Roadmap evolution".*
+*Last revised: maj 2026, M7 v3 close. Synchronizowany z ADR 0007 section "Roadmap Forward (Phase 3-7)".*

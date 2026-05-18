@@ -1,14 +1,18 @@
 # Current State
 
-*Stan na: maj 2026 · M3 → M3.5 → M6 foundation closed · commits pending stakeholder push*
+*Stan na: maj 2026 · M3 → M3.5 → M6 foundation → **M7 v3 cinematic foundation** closed · commits pending stakeholder push*
 
-Concise snapshot dla quick onboarding nowych uczestników (designers / devs / inwestorzy). Dla pełnej dokumentacji produktowej → [`PRODUCT.md`](PRODUCT.md). Dla roadmap forward → [`ROADMAP.md`](ROADMAP.md).
+Concise snapshot dla quick onboarding nowych uczestników (designers / devs / inwestorzy). Dla pełnej dokumentacji produktowej → [`PRODUCT.md`](PRODUCT.md). Dla roadmap forward → [`ROADMAP.md`](ROADMAP.md). Dla pełnego rationale paradygmatycznego pivotu → [`adr/0007-cinematic-foundation.md`](adr/0007-cinematic-foundation.md).
 
 ---
 
 ## TL;DR
 
-Plotview to platforma listingowa działek budowlanych z wbudowanym modułem analitycznym terenu. Faza A MVP w trakcie realizacji, M3 (Layer Panel UI) + M3.5 (viewer polish) + **M6 foundation (dense elevation reconstruction)** zamknięte. M6 ships C1–C4 only — siatka wysokościowa + Karta działki "Analiza terenu" stats — bez split-view comparison UX (C5 reverted; visualization quality must reach professional stand-alone reading przed pairing z porównaniem). M7 (Professional terrain visualization) jako next priority — hillshade + composite rendering + re-introduction of split-view chrome na top of upgraded base. Phase B premium tier z killer feature MPZP envelopes — parked po M10.
+Plotview to platforma listingowa działek budowlanych z wbudowanym modułem analitycznym terenu. Faza A MVP w trakcie realizacji, M3 (Layer Panel UI) + M3.5 (viewer polish) + M6 foundation (dense elevation reconstruction) zamknięte.
+
+**Paradygmatyczny pivot maj 2026:** dwie próby M7 w engineering-survey register (M7 v1 cartographic + M7 v2 surveyor labels) zostały zrewertowane na stakeholder visual ack — register telegrafował "technical instrument" zamiast "premium product." Stakeholder DNA shift (ADR 0007) re-scope'uje M7 jako **cinematic plot reconstruction platform** — quality reference Gaea3 + Death Stranding terrain + luxury real estate viz (Lumion / Twinmotion / Unreal).
+
+**M7 v3 cinematic foundation (Phase 1+2) closed (2026-05-18, 8 atomic commits).** Cesium + Three.js dual-canvas architecture z per-frame camera sync. Cesium-native post-processing pipeline: bloom (subtle highlights), ACES filmic tone mapping + HDR, custom-shader color grading (3 mood presets — Cinematic warm default / Dramatic / Natural — via dropdown w viewer chrome), FXAA edge smoothing. Scene immediately reads cinematic vs. M6 foundation baseline — proof-of-concept dla Phase 3+ deep content work (M8 v3 PBR terrain materials, M9 v3 vegetation scatter, M10 v3 atmospheric depth, M11 v3 time-of-day lighting, M12 v3 polish, M13+ buildings AI viz).
 
 ---
 
@@ -16,15 +20,18 @@ Plotview to platforma listingowa działek budowlanych z wbudowanym modułem anal
 
 ### 3D viewer (`/plots/<slug>` strona szczegółowa, sekcja 05)
 
+- **Architecture (M7 v3):** Cesium + Three.js dual-canvas coupled rendering — Cesium owns GIS context + canvas + user input pipeline; Three.js overlay canvas with `pointer-events: none` and `alpha: true` clear sits in front for future Phase 3+ scene content; per-frame camera sync via `scene.postRender` hook + plot-local ENU coordinate frame. Each renderer in its own WebGL context.
 - **Terrain:** polski NMT GRID1 1m bake na obszar Balice 773 + ×2 vertical exaggeration
 - **Imagery base:** ortofoto Geoportal · StandardResolution (25-50 cm/piksel)
 - **Imagery overlays:** Stamen Toner Lines + Stamen Toner Labels (Stadia Maps)
 - **Camera constraints:** zoom 5 km cap (M2.9 C1), pan rubber-band 3 km rim (M2.9 C2)
 - **Wheel-zoom ergonomics:** per-notch step `_zoomFactor = 1.75` (M3.5 C1, ~35% of Cesium default 5.0) + decay `inertiaZoom = 0.93` (M2.5-E C2). Google-Maps-satellite-feel controlled increment, NOT jumpy
-- **Lighting:** sun + NW rake light directional (M2.6)
+- **Lighting:** sun + NW rake light directional (M2.6 Cesium-side · M7 v3 C3 Three.js-side, identical 315°/30° geometry across both layers)
 - **Polygon overlay:** clay-toned ULDK GUGiK boundary, terrain-draped, lock-status invariant
 - **DOM overlay:** Karta działki anchored bottom-right (Balice DZIAŁKA 773 / 711 m² / Maks. zabudowa 213 m² · wys. 9 m) + **"Analiza terenu" section (M6 C4)** — five Polish-formatted rows (Wysokość min—max, Delta, Średni / Maks. spadek via Horn's method, Zróżnicowanie σ; locale `pl-PL` przecinki dziesiętne)
-- **Elevation heatmap (M6 C3, foundation):** "Siatka wysokościowa" overlay — per-plot NMT GRID1 raster colorized z editorial gradient (paper-faint → moss-soft → clay-deep) anchored to plot's actual elevation range. Default OFF; user opt-in via M3 panel. Lazy-loaded — GeoTIFF fetch tylko gdy toggled ON pierwszy raz per session. *Foundation only — visualization quality reads as low-contrast wash; M7 will upgrade z hillshade + composite rendering.*
+- **Elevation heatmap (M6 C3, foundation):** "Siatka wysokościowa" overlay — per-plot NMT GRID1 raster colorized z editorial gradient (paper-faint → moss-soft → clay-deep) anchored to plot's actual elevation range. Default OFF; user opt-in via M3 panel. Lazy-loaded — GeoTIFF fetch tylko gdy toggled ON pierwszy raz per session.
+- **Post-processing pipeline (M7 v3 C4-C7):** bloom on highlights (threshold 0.85 / strength 0.4 / radius 0.5) · ACES filmic tone mapping + HDR (exposure 1.0, clamped [0.5, 2.0]) · color grading via custom shader z 3 mood presets (Cinematic warm default / Dramatic / Natural) · FXAA edge smoothing. Pipeline routes through Cesium-native `scene.postProcessStages` (Three.js EffectComposer scaffolding deferred to Phase 3+ when Three.js scene content arrives).
+- **Mood dropdown (M7 v3 C6):** subtle viewer-chrome control at bottom-left, sibling to recenter button. Toggleable color-grade preset. Atelier styling (font-mono, uppercase 10px, 0.18em tracking, clay focus ring).
 
 ### Layer panel (M3)
 
@@ -77,7 +84,8 @@ Output: `compliant` / `warning` (≥90%) / `not_compliant` per check; overall st
 | Layer | Choice | Version |
 |-------|--------|---------|
 | Framework | Next.js + React + TypeScript strict | 16 / 18 / 5 |
-| 3D viewer | Cesium + Resium | 1.141 / 1.21 |
+| 3D viewer (Cesium side) | Cesium + Resium | 1.141 / 1.21 |
+| **3D viewer (Three.js side, M7 v3)** | **three + @react-three/fiber + drei + postprocessing + three-stdlib** | **0.169 / 8.18 / 9.122 / 2.16 / 2.36** |
 | Styling | Tailwind CSS + custom CSS vars | 3.4 |
 | State | React hooks + LayerRegistry subscribe channel | — |
 | Validation | Zod | 4.4 |
@@ -133,24 +141,33 @@ git push origin main
 
 ## Test suite
 
-**278/278 passing** (vitest + tsc + lint clean). +51 tests since M3.5 close (227 → 278) — wszystkie z M6 foundation surface (C1–C4). 1 pre-existing flaky network test (`t11-balice-773-runner`) hits live ULDK service — nie related do M6.
+**360/360 passing** (vitest + tsc + lint clean). +82 tests since M6 close (278 → 360) — wszystkie z M7 v3 cinematic foundation surface (C1–C7). 1 pre-existing flaky network test (`t11-balice-773-runner`) hits live ULDK service — nie related do M7 v3.
 
-Coverage breakdown:
+Coverage breakdown (M7 v3 additions in **bold**):
+
 - LayerRegistry (M2.5-B): 11 tests
 - polygonRenderer: 8 tests
 - rasterRenderer: 7 tests
 - labelRenderer: 6 tests
 - tilesetRenderer: 8 tests
 - domOverlayRenderer: 13 tests (+3 dla M6 C4 terrainStats branch)
-- **elevationHeatmapRenderer (M6 C3): 6 tests**
+- elevationHeatmapRenderer (M6 C3): 6 tests
 - renderOverlay dispatcher: 6 tests (exhaustiveness)
 - overlayReconciler: 9 tests (four branches + idempotence + orphan disposal + cycles + disposeAll)
 - LayerPanel: 12 tests (rendering + interaction)
 - LayerPanel grouping helper: 5 tests
 - localStorage persistence: 21 tests
-- **elevationSampler (M6 C2): 18 tests**
-- **elevationHeatmapConfig (M6 C3): 12 tests**
-- **elevationStatistics (M6 C4): 12 tests**
+- elevationSampler (M6 C2): 18 tests
+- elevationHeatmapConfig (M6 C3): 12 tests
+- elevationStatistics (M6 C4): 12 tests
+- **cesiumThreeBridge (M7 v3 C1): 8 tests** — ECEF ↔ plot-local Cartesian math + ENU rotation
+- **threeCanvas (M7 v3 C1): 10 tests** — renderer config invariants + pixel-ratio clamp
+- **cameraSynchronizer (M7 v3 C2): 12 tests** — position/direction/up sync, FOV conversion, near/far plane pins
+- **threeSceneManager (M7 v3 C3): 11 tests** — config defaults, sun direction cardinal cases + editorial NW 315°/30°
+- **composerPipeline — bloom (M7 v3 C4): 12 tests** — config pins, editorial → Cesium uniform curve monotonicity, edge cases
+- **composerPipeline — tone mapping (M7 v3 C5): 9 tests** — ACES default, exposure clamp band [0.5, 2.0]
+- **colorGrade (M7 v3 C6): 18 tests** — 3 preset slots, NATURAL identity invariant, editorial bounds (sat ≤1.2, contrast ≤1.25, |tint| ≤0.05), fault-tolerant lookup, shader uniform contract
+- **composerPipeline — fxaa (M7 v3 C7): 2 tests** — default-on pin, surface minimality
 - Other: ~117 tests (data validation, compliance engine, viz prompts, integration, etc.)
 
 ---
@@ -161,35 +178,37 @@ Coverage breakdown:
 
 - Push 4 commits do origin (stakeholder button)
 
-### M3.5 / M6 cleanup (closed)
+### M3.5 / M6 / M7 v3 cleanup (closed)
 
 - ✅ ~~Fullscreen mode 2D map fragment bug~~ — resolved 2026-05-15 (M3.5 C2; body class + global CSS hide rule joined via stable class-name constants in `src/lib/3d/fullscreenState.ts`)
 - ✅ ~~Wheel-zoom step too aggressive at M2.5-E-tuned 0.93 inertia~~ — resolved 2026-05-15 (M3.5 C1; `_zoomFactor = 1.75` per-notch step reduction)
-- ✅ ~~Dense elevation reconstruction foundation~~ — landed 2026-05-17 (M6 C1–C4). NMT GRID1 raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats. C5 (split-view comparison) reverted — deferred do M7 alongside the visualization upgrade.
+- ✅ ~~Dense elevation reconstruction foundation~~ — landed 2026-05-17 (M6 C1–C4). NMT GRID1 raster pipeline + sampler + heatmap layer + Karta działki "Analiza terenu" stats. C5 (split-view comparison) reverted at M6 close; M7 v1 + v2 attempted then both reverted; M7 v3 pivot supersedes.
+- ✅ ~~Cinematic visualization foundation~~ — landed 2026-05-18 (M7 v3 C1–C8). Dual-canvas Cesium+Three.js + camera sync + scene mgr + post-processing pipeline (bloom · ACES tone map · LUT color grade · FXAA) + mood dropdown UI + ADR 0007 + docs cascade.
 
-### M4 (next thematic milestone)
+### Next priority — Phase 3+ cinematic content track
 
-- MPZP layer (first thematic overlay, 2D version): connect "MPZP" toggle from M3 LayerPanel to KIMPZP WMS; semi-transparent imagery overlay with zone-color popups linking to gmina source docs
+- **M8 v3 — PBR terrain materials.** Albedo / normal / roughness / AO maps applied to the NMT terrain mesh via the new `threeMesh` renderer kind. First Phase 3+ Three.js scene content; the M7 v3 foundation's `threeSceneManager` + camera sync + post-processing pipeline all activate against real geometry here. ADR 0007 §"Roadmap Forward (Phase 3-7)" for sequence.
 
-### M5+ standalone milestones (forward)
+### Forward — parallel/secondary tracks
 
-- **M5** — Utility infrastructure layers ("Uzbrojenie terenu" section):
-  - Wodociągi · Kanalizacja · Energia · Gaz · Ciepłownictwo · Telekomunikacja
-  - Sources: Geoportal KIUT + emapa.gov.pl
-  - New LayerSectionKey value: `"uzbrojenie"`
-- **M6.5** — Profil terenu tool (cross-section line drawing z elevation chart, inspirowane Geoportal "Profil terenu"). *Renumbered from old M6 after the dense-elevation foundation landed first; sequence preserved jako analytical primitive po M6 foundation.*
-- **M7** — Professional terrain visualization (NEW, **next priority**): hillshade pass on top of the heatmap, composite rendering (heatmap blended with relief shading + ambient occlusion), per-cell contrast tuning, plus re-introduction of split-view comparison chrome (`SplitDirection` slider + REKONSTRUKCJA / ORTOFOTO side labels) na top of upgraded base. C5 deferred from M6 lands here.
-- **M8** — Analytical modules suite (slope advanced / sun path / drainage / canopy detection z NMPT). *Renumbered from old M7.*
-- **M9** — Building proposal generation (footprint optimization + multi-objective scoring + MPZP compliance check). *Renumbered from old M8.*
-- **M10** — AI visualization workflow expansion (Path B data-driven render + proportion validation pipeline). *Renumbered from old M9.*
+- **M4 — MPZP layer.** First thematic overlay (2D version): KIMPZP WMS through M3 LayerPanel; semi-transparent imagery overlay with zone-color popups linking to gmina source docs. Parallel-track to cinematic content; can land between any two cinematic milestones.
+- **M5 — Utility infrastructure layers ("Uzbrojenie terenu" section).** Wodociągi · Kanalizacja · Energia · Gaz · Ciepłownictwo · Telekomunikacja from Geoportal KIUT + emapa.gov.pl. New LayerSectionKey: `"uzbrojenie"`.
 
-### Phase B (post-M10)
+### Parked — engineering-track modules (revisit Phase 8+)
+
+The original engineering-survey roadmap (cross-section drawing tool, advanced analytical modules suite, split-view comparison) is **parked** following the M7 v3 paradigm pivot. These modules may return as Phase 8+ analytical UX on top of the cinematic platform once the visual reconstruction quality from Phase 3-7 justifies the analytical chrome.
+
+- **Profil terenu cross-section tool** — was M6.5; parked.
+- **Analytical modules suite** (slope advanced / sun path / drainage / canopy) — was M8; parked.
+- **Split-view comparison re-introduction** — was M6 C5 + M7 v1 + v2 in various iterations; parked.
+
+### Phase B (post-Phase-7 cinematic close)
 
 - Cesium ION Photorealistic 3D Tiles pilot (Google photogrammetric mesh)
 - GRID0.5 institutional access (PZGiK B2B contract)
 - Drone capture per-plot service (premium tier add-on)
 - Geotechnical investigation integration (PIG geological databases)
-- MPZP envelopes killer feature (parsed local plans → extruded 3D envelopes for neighbour plots)
+- MPZP envelopes killer feature (parsed local plans → extruded 3D envelopes for neighbour plots — natural fit on the cinematic platform with PBR + lighting)
 - Vector tile / server-side recolor dla "Atelier ink streets" (replace Stamen Toner Lines z editorial-color custom render)
 - UI viewMode plumbing (buyer / investor / developer modes)
 
@@ -243,7 +262,8 @@ Reference implementation. Wszystkie funkcjonalności rozwijane na tej działce.
 ## Quick links
 
 - [`PRODUCT.md`](PRODUCT.md) — pełna dokumentacja produktowa (16 000 słów)
-- [`ROADMAP.md`](ROADMAP.md) — forward roadmap M4-M12 + Phase B
+- [`ROADMAP.md`](ROADMAP.md) — forward roadmap (M7 v3 close → M8 v3 Phase 3+ cinematic content track)
 - [`CHANGELOG.md`](../CHANGELOG.md) — milestone chronology
-- [`adr/0006-interactive-3d-viewer-roadmap.md`](adr/0006-interactive-3d-viewer-roadmap.md) — master ADR
+- [`adr/0007-cinematic-foundation.md`](adr/0007-cinematic-foundation.md) — **M7 v3 paradigm pivot ADR** (cinematic plot reconstruction platform; supersedes ADR-0006 §M7)
+- [`adr/0006-interactive-3d-viewer-roadmap.md`](adr/0006-interactive-3d-viewer-roadmap.md) — original master ADR (M0-M6 foundations preserved; §M7 superseded by ADR-0007)
 - [`../README.md`](../README.md) — repo overview + quick start
