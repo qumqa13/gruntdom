@@ -28,6 +28,10 @@ import {
   syncThreeCameraState,
   type EnuBasisRowMajor,
 } from "@/lib/3d/cameraSynchronizer";
+import {
+  BLOOM_CONFIG,
+  buildBloomUniforms,
+} from "@/lib/3d/postProcessing/composerPipeline";
 import { createThreeCanvas, type ThreeCanvasHandle } from "@/lib/3d/threeCanvas";
 import {
   createThreeSceneManager,
@@ -650,6 +654,57 @@ export function Plot3DViewClient({
       v.scene.light = new Cesium.DirectionalLight({
         direction: lightTravelDirection,
       });
+
+      // ADR-0007 M7 v3 C4 — bloom post-process on Cesium pixels.
+      // Architectural fallback per the plan: Three.js EffectComposer
+      // can't read Cesium's framebuffer cleanly under the C1
+      // dual-canvas architecture, so Cesium-content post-processing
+      // routes through Cesium's native `scene.postProcessStages`
+      // API. Cesium 1.141 ships bloom as a built-in composite stage
+      // exposed at `scene.postProcessStages.bloom` (readonly handle
+      // — Cesium owns the stage's lifetime, we only tune its
+      // uniforms + flip the enabled flag). No `add()` / `remove()`
+      // calls needed; the disposer sets `enabled = false` so future
+      // re-mounts pick up the configured uniforms idempotently.
+      //
+      // Editorial config (threshold 0.85 / strength 0.4 / radius
+      // 0.5) sits in `composerPipeline.ts`; the integration here
+      // maps it through `buildBloomUniforms` to Cesium's internal
+      // contrast / brightness / sigma uniforms.
+      //
+      // Visual ack: sunny ortofoto highlights, sky pixels, and any
+      // bright clay polygon edges develop a subtle glow halo. The
+      // scene reads more cinematic; bloom is NOT Hollywood-overdone
+      // — threshold 0.85 confines it to only the brightest pixels.
+      if (BLOOM_CONFIG.enabled) {
+        try {
+          const bloom = v.scene.postProcessStages.bloom;
+          const uniforms = buildBloomUniforms();
+          // Cesium's bloom composite exposes its child stage
+          // uniforms through the top-level `.uniforms` proxy;
+          // assignments propagate to the appropriate inner pass.
+          bloom.uniforms.contrast = uniforms.contrast;
+          bloom.uniforms.brightness = uniforms.brightness;
+          bloom.uniforms.delta = uniforms.delta;
+          bloom.uniforms.sigma = uniforms.sigma;
+          bloom.uniforms.stepSize = uniforms.stepSize;
+          bloom.uniforms.glowOnly = uniforms.glowOnly;
+          bloom.enabled = true;
+          overlayDisposers.push(() => {
+            // Cesium owns the bloom stage's lifetime (it's a
+            // built-in composite on the PostProcessStageCollection);
+            // disabling on teardown is the symmetric inverse of the
+            // enabled = true above. Cesium's `destroy()` will
+            // release the underlying GL resources.
+            bloom.enabled = false;
+          });
+        } catch (bloomErr) {
+          console.warn(
+            "[Plot3DView] Bloom post-process tune failed — scene continues without bloom",
+            bloomErr,
+          );
+        }
+      }
 
       // ADR-0007 M7 v3 C2+C3 — Three.js scene + perspective camera
       // + per-frame Cesium-driven sync. The C1 overlay canvas hosts
