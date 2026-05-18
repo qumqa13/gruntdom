@@ -211,3 +211,36 @@ export const TONE_MAPPING_CONFIG: ToneMappingConfig = {
 export function clampExposure(exposure: number): number {
   return Math.min(Math.max(exposure, MIN_EXPOSURE), MAX_EXPOSURE);
 }
+
+/**
+ * ADR-0007 M7 v3 C7 — FXAA antialiasing.
+ *
+ * Final step in the post-processing pipeline. Cesium 1.141 ships
+ * FXAA (Fast Approximate Antialiasing) as a built-in stage at
+ * `scene.postProcessStages.fxaa`. Cesium enables it by default on
+ * scene init; we set the flag explicitly here so the M7 v3 viewer
+ * always opts in regardless of any future Cesium default change,
+ * and so a deliberate toggle-off becomes a single config edit
+ * instead of an invisible default-shift.
+ *
+ * Why FXAA over SMAA: SMAA isn't shipped natively in Cesium 1.141.
+ * Adding a custom SMAA stage would require either a community port
+ * or a hand-written GLSL implementation — both out-of-scope for the
+ * C7 visual ack. FXAA's quality at our render scale (single plot
+ * envelope, ~1280×800 typical canvas) is sufficient: polygon
+ * outlines + label edges read clean without the stairstep aliasing
+ * the un-FXAA'd C4-C6 pipeline showed on diagonal edges.
+ *
+ * Performance: FXAA is ~0.3 ms per frame on modern GPUs at 1080p,
+ * negligible against the M6 NMT terrain mesh + ortofoto streaming
+ * cost. SMAA's higher quality is not worth the engineering ramp at
+ * this milestone.
+ */
+export interface FxaaConfig {
+  /** Default-on per the plan + Cesium default. */
+  readonly enabled: boolean;
+}
+
+export const FXAA_CONFIG: FxaaConfig = {
+  enabled: true,
+};

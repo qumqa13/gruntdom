@@ -39,6 +39,7 @@ import {
 } from "@/lib/3d/postProcessing/colorGrade";
 import {
   BLOOM_CONFIG,
+  FXAA_CONFIG,
   TONE_MAPPING_CONFIG,
   buildBloomUniforms,
   clampExposure,
@@ -826,6 +827,38 @@ export function Plot3DViewClient({
           "[Plot3DView] Color grade stage setup failed — scene continues without mood preset",
           gradeErr,
         );
+      }
+
+      // ADR-0007 M7 v3 C7 — FXAA edge antialiasing. Cesium 1.141
+      // ships FXAA as a built-in stage at
+      // `scene.postProcessStages.fxaa`; it's enabled by default in
+      // 1.141 but we set the flag explicitly so a future Cesium
+      // default-shift can't silently regress the clean-edges visual
+      // ack. SMAA path deferred — not shipped natively in Cesium and
+      // a custom port is out-of-scope for this milestone; FXAA's
+      // quality at the plot-vicinity render scale is sufficient.
+      //
+      // Visual ack: plot polygon outline + Karta działki label
+      // edges read CLEAN — no stairstep aliasing on the diagonal
+      // segments the M6 baseline polygon shows without FXAA.
+      // Particularly visible at oblique camera angles where the
+      // outline crosses the ortofoto raster at non-axis-aligned
+      // angles.
+      if (FXAA_CONFIG.enabled) {
+        try {
+          v.scene.postProcessStages.fxaa.enabled = true;
+          // No teardown disposer: FXAA is Cesium's default-on
+          // behavior. Leaving it enabled across route navigations
+          // matches the default scene state; an explicit toggle-off
+          // would create asymmetric behavior between the first
+          // mount (FXAA on) and subsequent mounts (FXAA on, then
+          // off-from-this-disposer, then on-from-this-block-re-init).
+        } catch (fxaaErr) {
+          console.warn(
+            "[Plot3DView] FXAA enable failed — scene continues with raw edges",
+            fxaaErr,
+          );
+        }
       }
 
       // ADR-0007 M7 v3 C2+C3 — Three.js scene + perspective camera

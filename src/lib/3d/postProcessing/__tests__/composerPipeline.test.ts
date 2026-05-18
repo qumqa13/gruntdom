@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLOOM_CONFIG,
+  FXAA_CONFIG,
   MAX_EXPOSURE,
   MIN_EXPOSURE,
   TONE_MAPPING_CONFIG,
@@ -202,5 +203,20 @@ describe("exposure band constants", () => {
 
   it("pins MAX_EXPOSURE to 2.0 — above blows out highlights", () => {
     expect(MAX_EXPOSURE).toBe(2.0);
+  });
+});
+
+describe("FXAA_CONFIG", () => {
+  it("ships with FXAA default-ON (clean edges on plot polygon + labels)", () => {
+    expect(FXAA_CONFIG.enabled).toBe(true);
+  });
+
+  it("config shape exposes exactly the `enabled` field — no over-engineered surface", () => {
+    // Pin minimality: FXAA in Cesium 1.141 has no public uniforms to
+    // tune through `scene.postProcessStages.fxaa`. If a future Cesium
+    // version exposes knobs and we add them, this test fails as a
+    // reminder to consider whether the editorial intent (subtle edge
+    // smoothing) needs the new surface.
+    expect(Object.keys(FXAA_CONFIG)).toEqual(["enabled"]);
   });
 });
