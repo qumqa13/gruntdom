@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import { ZOOM_FACTOR } from "@/lib/3d/cameraConstants";
+import { createThreeCanvas, type ThreeCanvasHandle } from "@/lib/3d/threeCanvas";
 import { LayerRegistry } from "@/lib/overlays/LayerRegistry";
 import {
   createDebouncedVisibilitySaver,
@@ -425,6 +426,13 @@ export function Plot3DViewClient({
     let loadingFadeTimer: ReturnType<typeof setTimeout> | null = null;
     let detachRender: (() => void) | null = null;
     const overlayDisposers: OverlayDisposer[] = [];
+    // ADR-0007 M7 v3 C1 — Three.js overlay handle. Initialised after
+    // Cesium creates its widget DOM (so the overlay canvas appends as
+    // a later sibling and naturally stacks above), torn down before
+    // viewer.destroy() so the overlay never references a wiped
+    // container. C1 scope = empty Three.js scene; visual ack must
+    // show the M6 foundation render unchanged.
+    let threeHandle: ThreeCanvasHandle | null = null;
 
     (async () => {
       const Cesium = await import("cesium");
@@ -528,6 +536,44 @@ export function Plot3DViewClient({
       });
       viewer = v;
       viewerHandleRef.current = v;
+
+      // ADR-0007 M7 v3 C1 — Three.js overlay canvas. Cesium's Viewer
+      // constructor has now appended its widget DOM (canvas + credit
+      // container) into cesiumMountRef.current; the overlay canvas
+      // appends as a later sibling and stacks above Cesium's surface
+      // in document order. `pointer-events: none` on the overlay
+      // routes all input through to Cesium so the M2.5-D activation
+      // gate, M2.5-E inertia tuning, and M2.9 pan rubber-band remain
+      // unchanged. C1 leaves the Three.js scene empty — visual ack
+      // requirement is "identical to f3a4f63 mount" with both
+      // renderers initialized; content arrives Phase 3 (M8 v3+).
+      if (cesiumMountRef.current) {
+        try {
+          const rect = cesiumMountRef.current.getBoundingClientRect();
+          threeHandle = await createThreeCanvas(cesiumMountRef.current, {
+            width: Math.max(rect.width, 1),
+            height: Math.max(rect.height, 1),
+            devicePixelRatio:
+              typeof window !== "undefined"
+                ? window.devicePixelRatio || 1
+                : 1,
+          });
+          if (disposed) {
+            threeHandle.dispose();
+            threeHandle = null;
+          }
+        } catch (threeErr) {
+          // Fail open: Cesium continues to render normally without
+          // the Three.js overlay if the renderer init fails (e.g. WebGL
+          // context exhausted on a low-end device that already used its
+          // two-context budget on Cesium). Phase 3+ adds the actual
+          // visual content; until then, a missing overlay is invisible.
+          console.warn(
+            "[Plot3DView] Three.js overlay init failed — Cesium continues alone",
+            threeErr,
+          );
+        }
+      }
 
       v.scene.backgroundColor = Cesium.Color.fromCssColorString(PAPER_HEX);
       v.scene.globe.show = true;
@@ -1232,6 +1278,17 @@ export function Plot3DViewClient({
       // non-entity state (timers, listeners) clean up correctly.
       for (const dispose of overlayDisposers) dispose();
       overlayDisposers.length = 0;
+      // ADR-0007 M7 v3 C1 — dispose the Three.js overlay BEFORE
+      // Cesium tears down its widget DOM. The overlay canvas is a
+      // child of cesiumMountRef.current; Cesium's destroy() only
+      // wipes the elements it created itself, so the overlay would
+      // technically survive, but disposing first releases the WebGL
+      // context cleanly before its parent is repainted by a future
+      // remount.
+      if (threeHandle) {
+        threeHandle.dispose();
+        threeHandle = null;
+      }
       if (viewer) viewer.destroy();
       viewerHandleRef.current = null;
       resetCameraRef.current = null;
