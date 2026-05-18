@@ -29,6 +29,15 @@ import {
   type EnuBasisRowMajor,
 } from "@/lib/3d/cameraSynchronizer";
 import {
+  COLOR_GRADE_FRAGMENT_SHADER,
+  COLOR_GRADE_PRESETS,
+  COLOR_GRADE_PRESET_ORDER,
+  DEFAULT_COLOR_GRADE_PRESET,
+  buildColorGradeUniforms,
+  resolveColorGradePreset,
+  type ColorGradePresetName,
+} from "@/lib/3d/postProcessing/colorGrade";
+import {
   BLOOM_CONFIG,
   TONE_MAPPING_CONFIG,
   buildBloomUniforms,
@@ -400,6 +409,18 @@ export function Plot3DViewClient({
   // toggles the 300 ms opacity fade just before unmount.
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFading, setIsLoadingFading] = useState(false);
+  // ADR-0007 M7 v3 C6 — color-grade preset state + an apply-callback
+  // ref. The mount IIFE creates Cesium's `PostProcessStage` once and
+  // stores a setter on `colorGradeApplyRef` that knows how to write
+  // new uniforms onto its `.uniforms` proxy. A sibling useEffect
+  // mirrors state changes through the setter so the mood dropdown
+  // updates the stage without re-running the (expensive) mount IIFE.
+  const [colorGradePreset, setColorGradePreset] =
+    useState<ColorGradePresetName>(DEFAULT_COLOR_GRADE_PRESET);
+  const colorGradeApplyRef = useRef<
+    ((name: ColorGradePresetName) => void) | null
+  >(null);
+
   // M2.7 C6 → M3 C1 — LayerRegistry instance lifted into component
   // state so the new `LayerPanel` UI can subscribe to it as a prop.
   // The viewer init IIFE below creates a fresh `LayerRegistry`,
@@ -750,6 +771,61 @@ export function Plot3DViewClient({
             tonemapErr,
           );
         }
+      }
+
+      // ADR-0007 M7 v3 C6 — color grading via custom Cesium
+      // PostProcessStage. Hand-tuned shader (saturation × contrast ×
+      // tint shift) implements the LUT math layer; full PNG-asset
+      // 3D LUT pipeline deferred to a follow-up polish item once an
+      // editorial pass designs the actual LUT files. Same surface
+      // contract: three preset slots (Cinematic warm default,
+      // Dramatic, Natural), runtime-switchable via the mood
+      // dropdown.
+      //
+      // The setter pattern wires the stage into the outer React
+      // state path: the mount IIFE creates the stage once and
+      // stores an apply-uniforms thunk on `colorGradeApplyRef`; a
+      // sibling useEffect outside the IIFE mirrors state changes
+      // into the thunk so the dropdown re-renders don't restart
+      // the (expensive) Cesium init.
+      try {
+        const colorGradeStage = new Cesium.PostProcessStage({
+          fragmentShader: COLOR_GRADE_FRAGMENT_SHADER,
+          uniforms: {
+            tintRgb: new Cesium.Cartesian3(0, 0, 0),
+            saturation: 1.0,
+            contrast: 1.0,
+          },
+        });
+        v.scene.postProcessStages.add(colorGradeStage);
+        const applyColorGrade = (name: ColorGradePresetName) => {
+          const preset = resolveColorGradePreset(name);
+          const u = buildColorGradeUniforms(preset);
+          // Cesium's PostProcessStage uniforms proxy accepts plain
+          // values for vec3 (auto-wraps to Cartesian3); assigning a
+          // pre-built Cartesian3 is explicit + lints cleanly under
+          // TypeScript's noImplicitAny.
+          colorGradeStage.uniforms.tintRgb = new Cesium.Cartesian3(
+            u.tintRgb[0],
+            u.tintRgb[1],
+            u.tintRgb[2],
+          );
+          colorGradeStage.uniforms.saturation = u.saturation;
+          colorGradeStage.uniforms.contrast = u.contrast;
+        };
+        // Apply the initial preset BEFORE publishing the setter so
+        // the first paint already shows the graded scene.
+        applyColorGrade(colorGradePreset);
+        colorGradeApplyRef.current = applyColorGrade;
+        overlayDisposers.push(() => {
+          v.scene.postProcessStages.remove(colorGradeStage);
+          colorGradeApplyRef.current = null;
+        });
+      } catch (gradeErr) {
+        console.warn(
+          "[Plot3DView] Color grade stage setup failed — scene continues without mood preset",
+          gradeErr,
+        );
       }
 
       // ADR-0007 M7 v3 C2+C3 — Three.js scene + perspective camera
@@ -1624,6 +1700,18 @@ export function Plot3DViewClient({
     v.scene.screenSpaceCameraController.enableInputs = isActive;
   }, [isActive]);
 
+  // ADR-0007 M7 v3 C6 — live sync mood preset → color-grade stage
+  // uniforms. Reads `colorGradeApplyRef`, which the mount IIFE
+  // publishes after the PostProcessStage is wired. The first user
+  // toggle of the dropdown writes new uniform values onto the same
+  // stage instance — no remount, no flash. A null ref (mount IIFE
+  // hasn't finished yet, or the stage init failed open) short-
+  // circuits so the dropdown change still updates React state for
+  // the next paint without throwing.
+  useEffect(() => {
+    colorGradeApplyRef.current?.(colorGradePreset);
+  }, [colorGradePreset]);
+
   // M2.5-D C1 — deactivate when the user presses Esc or clicks outside
   // the viewer while active. Listener is only attached while active, so
   // the activation click itself (which lands inside the wrapper anyway)
@@ -1722,6 +1810,31 @@ export function Plot3DViewClient({
       >
         <ReticleGlyph />
       </button>
+      {/* ADR-0007 M7 v3 C6 — mood dropdown for color-grade presets.
+          Editorial chrome sibling of the recenter button (bottom-left
+          cluster). Pure HTML select keeps the Atelier feel — same
+          font-mono / uppercase / 0.18em tracking the other chrome
+          uses for editorial text; clay focus ring matches the
+          recenter button's focus state. z-[16] sits above the
+          activation gate so the dropdown stays clickable while the
+          viewer is inert. */}
+      <label className="absolute bottom-3 left-14 z-[16] flex items-center gap-2 rounded-xs border border-line/60 bg-paper/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-muted shadow-card transition-colors duration-200 hover:text-ink-soft focus-within:ring-2 focus-within:ring-clay/60">
+        <span aria-hidden>Nastrój</span>
+        <select
+          value={colorGradePreset}
+          onChange={(e) =>
+            setColorGradePreset(e.target.value as ColorGradePresetName)
+          }
+          className="border-none bg-transparent font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft outline-none"
+          aria-label="Wybierz nastrój widoku (color grading)"
+        >
+          {COLOR_GRADE_PRESET_ORDER.map((name) => (
+            <option key={name} value={name}>
+              {COLOR_GRADE_PRESETS[name].label}
+            </option>
+          ))}
+        </select>
+      </label>
       {!isActive && (
         <button
           type="button"
